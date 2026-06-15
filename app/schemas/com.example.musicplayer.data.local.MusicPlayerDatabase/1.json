@@ -1,0 +1,242 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "e2422285e4c27cd2223ece8eaee18787",
+    "entities": [
+      {
+        "tableName": "users",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`user_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `display_name` TEXT NOT NULL, `email` TEXT NOT NULL, `password_hash` TEXT NOT NULL, `avatar_uri` TEXT, `created_at` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "userId",
+            "columnName": "user_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "display_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "email",
+            "columnName": "email",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "passwordHash",
+            "columnName": "password_hash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "avatarUri",
+            "columnName": "avatar_uri",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "user_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_users_email",
+            "unique": true,
+            "columnNames": [
+              "email"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_users_email` ON `${TABLE_NAME}` (`email`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "playlists",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`playlist_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `owner_user_id` INTEGER NOT NULL, `name` TEXT NOT NULL, `description` TEXT, `created_at` INTEGER NOT NULL, FOREIGN KEY(`owner_user_id`) REFERENCES `users`(`user_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "playlistId",
+            "columnName": "playlist_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ownerUserId",
+            "columnName": "owner_user_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "playlist_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_playlists_owner_user_id",
+            "unique": false,
+            "columnNames": [
+              "owner_user_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_playlists_owner_user_id` ON `${TABLE_NAME}` (`owner_user_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "users",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "owner_user_id"
+            ],
+            "referencedColumns": [
+              "user_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "playlist_song_cross_ref",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`playlist_id` INTEGER NOT NULL, `song_id` INTEGER NOT NULL, `position` INTEGER NOT NULL, PRIMARY KEY(`playlist_id`, `song_id`), FOREIGN KEY(`playlist_id`) REFERENCES `playlists`(`playlist_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "playlistId",
+            "columnName": "playlist_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "songId",
+            "columnName": "song_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "playlist_id",
+            "song_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_playlist_song_cross_ref_playlist_id",
+            "unique": false,
+            "columnNames": [
+              "playlist_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_playlist_song_cross_ref_playlist_id` ON `${TABLE_NAME}` (`playlist_id`)"
+          },
+          {
+            "name": "index_playlist_song_cross_ref_song_id",
+            "unique": false,
+            "columnNames": [
+              "song_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_playlist_song_cross_ref_song_id` ON `${TABLE_NAME}` (`song_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "playlists",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "playlist_id"
+            ],
+            "referencedColumns": [
+              "playlist_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "favorites",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`songId` INTEGER NOT NULL, `title` TEXT NOT NULL, `artist` TEXT NOT NULL, `albumArtUri` TEXT NOT NULL, PRIMARY KEY(`songId`))",
+        "fields": [
+          {
+            "fieldPath": "songId",
+            "columnName": "songId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "artist",
+            "columnName": "artist",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "albumArtUri",
+            "columnName": "albumArtUri",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "songId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e2422285e4c27cd2223ece8eaee18787')"
+    ]
+  }
+}
