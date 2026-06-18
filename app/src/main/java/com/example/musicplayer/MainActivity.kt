@@ -1,6 +1,7 @@
 package com.example.musicplayer
 
 import android.Manifest
+import android.content.ComponentName
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -14,8 +15,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import com.example.musicplayer.data.local.SessionManager
+import com.example.musicplayer.player.PlaybackService
 import com.example.musicplayer.ui.navigation.AppNavGraph
 import com.example.musicplayer.ui.theme.MusicPlayerTheme
 import com.example.musicplayer.viewmodel.ThemeViewModel
@@ -28,10 +33,22 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var sessionManager: SessionManager
 
+    // THE FIX: We need to hold a reference to the MediaController
+    private var mediaController: MediaController? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         actionBar?.hide()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // THE FIX: Restored the MediaController binding!
+        // This tells Android OS that this app is playing media, which triggers the notification.
+        val sessionToken = SessionToken(this, ComponentName(this, PlaybackService::class.java))
+        val controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
+        controllerFuture.addListener(
+            { mediaController = controllerFuture.get() },
+            ContextCompat.getMainExecutor(this)
+        )
 
         val requestPermissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
@@ -53,7 +70,6 @@ class MainActivity : ComponentActivity() {
             val themeViewModel: ThemeViewModel = hiltViewModel()
             val isDarkMode by themeViewModel.isDarkMode.collectAsState()
 
-            // FIXED: Using your custom MusicPlayerTheme!
             MusicPlayerTheme(darkTheme = isDarkMode, dynamicColor = false) {
                 Surface(
                     modifier = Modifier.fillMaxSize().systemBarsPadding(),
@@ -65,5 +81,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Clean up the controller when the app is destroyed
+        mediaController?.release()
     }
 }
