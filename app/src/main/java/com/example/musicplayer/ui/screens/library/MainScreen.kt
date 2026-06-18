@@ -11,7 +11,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -194,16 +198,34 @@ fun MainScreen(
                 }
                 2 -> {
                     if (selectedPlaylist == null) {
-                        LazyColumn(
+                        // THE NEW SPOTIFY/APPLE MUSIC STYLE GRID DESIGN
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 120.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            item {
-                                Button(onClick = { showPlaylistDialog = true }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp)) { Text("Create New Playlist") }
+                            item(span = { GridItemSpan(2) }) {
+                                // Sleek Create Playlist Card
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp, bottom = 8.dp)
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                                        .clickable { showPlaylistDialog = true }
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Create New Playlist", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                }
                             }
 
                             if (customPlaylists.isEmpty()) {
-                                item {
+                                item(span = { GridItemSpan(2) }) {
                                     Column(modifier = Modifier.fillMaxWidth().padding(top = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                         Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null, modifier = Modifier.size(80.dp), tint = Color.Gray)
                                         Spacer(modifier = Modifier.height(16.dp))
@@ -215,45 +237,71 @@ fun MainScreen(
                                     val songCount = customPlaylists[playlistName]?.size ?: 0
                                     val firstSong = customPlaylists[playlistName]?.firstOrNull()
 
-                                    Row(
+                                    // Premium Square Album Art Card
+                                    Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clip(RoundedCornerShape(20.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                                            .aspectRatio(1f) // Makes it perfectly square
+                                            .clip(RoundedCornerShape(24.dp))
+                                            .shadow(8.dp, RoundedCornerShape(24.dp))
                                             .clickable { selectedPlaylist = playlistName }
-                                            .padding(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
+                                        // 1. Background Image or Fallback Gradient
+                                        if (firstSong?.albumArtUri == null || firstSong.albumArtUri.toString().isEmpty()) {
+                                            Box(
+                                                modifier = Modifier.fillMaxSize().background(
+                                                    Brush.linearGradient(
+                                                        colors = listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.background)
+                                                    )
+                                                ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+                                            }
+                                        } else {
+                                            AsyncImage(
+                                                model = ImageRequest.Builder(LocalContext.current).data(firstSong.albumArtUri).crossfade(true).build(),
+                                                contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()
+                                            )
+                                        }
+
+                                        // 2. Dark Gradient Overlay (Ensures text is always readable over any album cover)
                                         Box(
                                             modifier = Modifier
-                                                .size(64.dp)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            if (firstSong?.albumArtUri == null || firstSong.albumArtUri.toString().isEmpty()) {
-                                                Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, modifier = Modifier.size(36.dp), tint = MaterialTheme.colorScheme.primary)
-                                            } else {
-                                                AsyncImage(
-                                                    model = ImageRequest.Builder(LocalContext.current).data(firstSong.albumArtUri).crossfade(true).build(),
-                                                    contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()
+                                                .fillMaxSize()
+                                                .background(
+                                                    Brush.verticalGradient(
+                                                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.9f)),
+                                                        startY = 150f // Pushes the darkness toward the bottom half
+                                                    )
                                                 )
+                                        )
+
+                                        // 3. Playlist Name & Count (Bottom Left)
+                                        Column(
+                                            modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)
+                                        ) {
+                                            Text(text = playlistName, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(text = "$songCount songs", fontSize = 12.sp, color = Color.White.copy(alpha = 0.7f), fontWeight = FontWeight.Medium)
+                                        }
+
+                                        // 4. Glassmorphic Action Pill (Top Right)
+                                        Row(
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(12.dp)
+                                                .clip(RoundedCornerShape(16.dp))
+                                                .background(Color.Black.copy(alpha = 0.5f)) // Glassy black
+                                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            IconButton(onClick = { playlistToRename = playlistName; renamePlaylistName = playlistName }, modifier = Modifier.size(32.dp)) {
+                                                Icon(Icons.Default.Edit, "Edit", tint = Color.White, modifier = Modifier.size(18.dp))
                                             }
-                                        }
-
-                                        Spacer(modifier = Modifier.width(16.dp))
-
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(text = playlistName, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text(text = "$songCount songs", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-
-                                        IconButton(onClick = { playlistToRename = playlistName; renamePlaylistName = playlistName }, modifier = Modifier.size(48.dp)) {
-                                            Icon(Icons.Default.Edit, "Edit", tint = MaterialTheme.colorScheme.primary)
-                                        }
-                                        IconButton(onClick = { playlistViewModel.deletePlaylist(playlistName) }, modifier = Modifier.size(48.dp)) {
-                                            Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
+                                            IconButton(onClick = { playlistViewModel.deletePlaylist(playlistName) }, modifier = Modifier.size(32.dp)) {
+                                                Icon(Icons.Default.Delete, "Delete", tint = Color.White, modifier = Modifier.size(18.dp))
+                                            }
                                         }
                                     }
                                 }
@@ -309,7 +357,6 @@ fun MainScreen(
                     onClick = { navController.navigate("player") },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        // THE GAP FIX: Changed bottom padding to 0.dp
                         .padding(bottom = 0.dp, start = 16.dp, end = 16.dp)
                         .shadow(16.dp, RoundedCornerShape(24.dp))
                 )
