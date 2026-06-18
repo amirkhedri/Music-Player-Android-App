@@ -7,19 +7,15 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "users",
-    indices = [Index(value = ["email"], unique = true)]
+    indices = [Index(value = ["username"], unique = true)]
 )
 data class UserEntity(
-
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "user_id")
     val userId: Long = 0,
 
-    @ColumnInfo(name = "display_name")
-    val displayName: String,
-
-    @ColumnInfo(name = "email")
-    val email: String,
+    @ColumnInfo(name = "username")
+    val username: String,
 
     @ColumnInfo(name = "password_hash")
     val passwordHash: String,

@@ -19,16 +19,20 @@ interface UserDao {
     @Query(
         """
         SELECT * FROM users
-        WHERE email = :email
+        WHERE username = :username
           AND password_hash = :passwordHash
         LIMIT 1
         """
     )
-    suspend fun getUserByCredentials(email: String, passwordHash: String): UserEntity?
+    suspend fun getUserByCredentials(username: String, passwordHash: String): UserEntity?
 
     @Query("SELECT * FROM users WHERE user_id = :userId LIMIT 1")
     fun getUserById(userId: Long): Flow<UserEntity?>
 
-    @Query("SELECT COUNT(*) FROM users WHERE email = :email")
-    suspend fun emailExists(email: String): Int
+    @Query("SELECT COUNT(*) FROM users WHERE username = :username")
+    suspend fun userExists(username: String): Int
+
+    // NEW: Query to update a forgotten password
+    @Query("UPDATE users SET password_hash = :newPasswordHash WHERE username = :username")
+    suspend fun updatePassword(username: String, newPasswordHash: String)
 }

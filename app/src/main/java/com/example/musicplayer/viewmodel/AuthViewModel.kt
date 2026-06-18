@@ -15,7 +15,6 @@ class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
-    // Exposes the logged-in user ID as a StateFlow so Compose UI can react instantly
     val loggedInUserId: StateFlow<Long> = authRepository.loggedInUserId
         .stateIn(
             scope = viewModelScope,
@@ -23,17 +22,19 @@ class AuthViewModel @Inject constructor(
             initialValue = -1L
         )
 
-    suspend fun login(email: String, passwordRaw: String): Boolean {
-        return authRepository.login(email, passwordRaw)
+    suspend fun login(username: String, passwordRaw: String): Boolean {
+        return authRepository.login(username, passwordRaw)
     }
 
-    suspend fun register(displayName: String, email: String, passwordRaw: String): Boolean {
-        return authRepository.register(displayName, email, passwordRaw)
+    suspend fun register(username: String, passwordRaw: String): Boolean {
+        return authRepository.register(username, passwordRaw)
+    }
+
+    suspend fun resetPassword(username: String, newPasswordRaw: String): Boolean {
+        return authRepository.resetPassword(username, newPasswordRaw)
     }
 
     fun logout() {
-        viewModelScope.launch {
-            authRepository.logout()
-        }
+        viewModelScope.launch { authRepository.logout() }
     }
 }
