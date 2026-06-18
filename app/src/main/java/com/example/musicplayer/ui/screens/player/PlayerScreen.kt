@@ -1,7 +1,9 @@
 package com.example.musicplayer.ui.screens.player
 
 import android.annotation.SuppressLint
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,7 +13,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -40,17 +46,31 @@ fun PlayerScreen(navController: NavController, playerViewModel: PlayerViewModel)
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val position by playerViewModel.currentPosition.collectAsState()
     val isShuffle by playerViewModel.isShuffleEnabled.collectAsState()
-
     val realDuration by playerViewModel.duration.collectAsState()
 
     var sliderPosition by remember { mutableFloatStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
+
+    val animatedProgress by animateFloatAsState(
+        targetValue = sliderPosition,
+        animationSpec = tween(
+            durationMillis = if (isPlaying && !isDragging) 1000 else 0,
+            easing = LinearEasing
+        ),
+        label = "smooth_progress"
+    )
 
     LaunchedEffect(position) {
         if (!isDragging) sliderPosition = position.toFloat()
     }
 
     val fallbackIcon = rememberVectorPainter(Icons.Default.MusicNote)
+    val backgroundBrush = Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    )
 
     Scaffold(
         topBar = {
@@ -60,96 +80,182 @@ fun PlayerScreen(navController: NavController, playerViewModel: PlayerViewModel)
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         }
     ) { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(backgroundBrush)
+                .padding(padding)
         ) {
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Box(
-                modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
-                contentAlignment = Alignment.Center
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current).data(song?.albumArtUri).crossfade(true).build(),
-                    contentDescription = "Album Art",
-                    contentScale = ContentScale.Crop,
-                    error = fallbackIcon,
-                    fallback = fallbackIcon,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+                Spacer(modifier = Modifier.height(32.dp))
 
-            Spacer(modifier = Modifier.height(48.dp))
-
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(text = song?.title ?: "No Song Selected", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(text = song?.artist ?: "Unknown Artist", fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            val safeDuration = if (realDuration > 0) realDuration else (song?.durationMs ?: 100L).coerceAtLeast(100L)
-
-            Slider(
-                value = sliderPosition.coerceIn(0f, safeDuration.toFloat()),
-                onValueChange = { isDragging = true; sliderPosition = it },
-                onValueChangeFinished = { isDragging = false; playerViewModel.seekTo(sliderPosition.toLong()) },
-                valueRange = 0f..safeDuration.toFloat()
-            )
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(text = formatTime(sliderPosition.toLong()), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(text = formatTime(safeDuration), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-
-            // NEW: The Perfectly Balanced Media Controls Layout
-            Box(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp, top = 16.dp)
-            ) {
-                // Shuffle Button anchored to the far left edge
-                IconButton(
-                    onClick = { playerViewModel.toggleShuffle() },
-                    modifier = Modifier.align(Alignment.CenterStart)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .shadow(elevation = 24.dp, shape = RoundedCornerShape(32.dp), spotColor = MaterialTheme.colorScheme.primary)
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(MaterialTheme.colorScheme.secondaryContainer),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Shuffle,
-                        "Shuffle",
-                        tint = if (isShuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(song?.albumArtUri)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Album Art",
+                        contentScale = ContentScale.Crop,
+                        error = fallbackIcon,
+                        fallback = fallbackIcon,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
 
-                // Core media controls grouped dead center
+                Spacer(modifier = Modifier.height(48.dp))
+
                 Row(
-                    modifier = Modifier.align(Alignment.Center),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    IconButton(onClick = { playerViewModel.skipPrevious() }) {
-                        Icon(Icons.Default.SkipPrevious, "Previous", modifier = Modifier.size(48.dp))
+                    Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                        Text(
+                            text = song?.title ?: "No Song Selected",
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            modifier = Modifier.basicMarquee()
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = song?.artist ?: "Unknown Artist",
+                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            modifier = Modifier.basicMarquee()
+                        )
                     }
+                    PlayingVisualizer(isPlaying = isPlaying)
+                }
 
-                    Spacer(modifier = Modifier.width(24.dp))
+                Spacer(modifier = Modifier.weight(1f))
 
+                val safeDuration = if (realDuration > 0) realDuration else (song?.durationMs ?: 100L).coerceAtLeast(100L)
+                val currentDisplayPosition = if (isDragging) sliderPosition else animatedProgress
+
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    PremiumProgressBar(
+                        progress = currentDisplayPosition,
+                        max = safeDuration.toFloat(),
+                        onProgressChanged = {
+                            isDragging = true
+                            sliderPosition = it
+                        },
+                        onDragFinished = {
+                            isDragging = false
+                            playerViewModel.seekTo(sliderPosition.toLong())
+                        }
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = formatTime(currentDisplayPosition.toLong()), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+                        Text(text = formatTime(safeDuration), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, top = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    IconButton(onClick = { playerViewModel.toggleShuffle() }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.Shuffle, "Shuffle", tint = if (isShuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+                    }
+                    IconButton(onClick = { playerViewModel.skipPrevious() }, modifier = Modifier.size(56.dp)) {
+                        Icon(Icons.Default.SkipPrevious, "Previous", modifier = Modifier.size(40.dp))
+                    }
                     FloatingActionButton(
                         onClick = { playerViewModel.togglePlayPause() },
                         shape = CircleShape,
                         containerColor = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(80.dp)
+                        modifier = Modifier.size(80.dp).shadow(8.dp, CircleShape)
                     ) {
                         Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, "Play/Pause", modifier = Modifier.size(40.dp))
                     }
-
-                    Spacer(modifier = Modifier.width(24.dp))
-
-                    IconButton(onClick = { playerViewModel.skipNext() }) {
-                        Icon(Icons.Default.SkipNext, "Next", modifier = Modifier.size(48.dp))
+                    IconButton(onClick = { playerViewModel.skipNext() }, modifier = Modifier.size(56.dp)) {
+                        Icon(Icons.Default.SkipNext, "Next", modifier = Modifier.size(40.dp))
+                    }
+                    IconButton(onClick = { }, enabled = false, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.MoreVert, "More", tint = Color.Transparent)
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun PremiumProgressBar(progress: Float, max: Float, onProgressChanged: (Float) -> Unit, onDragFinished: () -> Unit) {
+    val fraction = if (max > 0) (progress / max).coerceIn(0f, 1f) else 0f
+
+    val activeBrush = Brush.horizontalGradient(
+        colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
+    )
+
+    Box(
+        modifier = Modifier.fillMaxWidth().height(36.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(modifier = Modifier.fillMaxWidth().height(12.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(fraction)
+                .height(12.dp)
+                .align(Alignment.CenterStart)
+                .clip(CircleShape)
+                .background(activeBrush)
+        )
+
+        Slider(
+            value = progress,
+            onValueChange = onProgressChanged,
+            onValueChangeFinished = onDragFinished,
+            valueRange = 0f..max,
+            modifier = Modifier.fillMaxWidth().alpha(0f)
+        )
+    }
+}
+
+@Composable
+fun PlayingVisualizer(isPlaying: Boolean) {
+    val infiniteTransition = rememberInfiniteTransition(label = "eq_transition")
+    val heights = List(4) { index ->
+        infiniteTransition.animateFloat(
+            initialValue = 0.2f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(animation = tween(durationMillis = 300 + (index * 150), easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+            label = "bar_$index"
+        )
+    }
+    val animatedHeights = heights.map { heightState ->
+        animateFloatAsState(targetValue = if (isPlaying) heightState.value else 0.2f, animationSpec = tween(durationMillis = 300), label = "pause_settle")
+    }
+
+    Row(modifier = Modifier.height(28.dp).padding(bottom = 6.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        animatedHeights.forEach { animatedHeight ->
+            Box(modifier = Modifier.width(4.dp).fillMaxHeight(animatedHeight.value).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
         }
     }
 }

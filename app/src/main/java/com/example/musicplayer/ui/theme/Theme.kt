@@ -1,6 +1,5 @@
 package com.example.musicplayer.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -9,35 +8,50 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = AccentPrimary,
+    secondary = AccentSecondary,
+    tertiary = AccentSecondary,
+    background = DeepBackground,
+    surface = SurfaceDark,
+    surfaceVariant = SurfaceVariantDark,
+    onPrimary = Color.Black,
+    onBackground = Color.White,
+    onSurface = Color.White,
+    onSurfaceVariant = Color.LightGray,
+
+    // THE FIX: Explicitly setting the container colors to override the default Purple!
+    primaryContainer = Color(0xFF00333D), // A sleek, deep dark cyan for the MiniPlayer/Selected Song
+    onPrimaryContainer = AccentPrimary,   // Makes the icons and text pop with Electric Cyan
+    secondaryContainer = Color(0xFF2A2A2A), // Dark gray for album art placeholders
+    onSecondaryContainer = Color.White
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = AccentPrimaryLight,
+    secondary = AccentPrimaryLight,
+    background = LightBackground,
+    surface = SurfaceLight,
+    surfaceVariant = SurfaceVariantLight,
     onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    onBackground = Color.Black,
+    onSurface = Color.Black,
+    onSurfaceVariant = Color.DarkGray,
+
+    // Light theme overrides
+    primaryContainer = Color(0xFFEADDFF),
+    onPrimaryContainer = AccentPrimaryLight,
+    secondaryContainer = Color(0xFFF3EDF7),
+    onSecondaryContainer = Color.Black
 )
 
 @Composable
 fun MusicPlayerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -45,7 +59,6 @@ fun MusicPlayerTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }

@@ -1,7 +1,6 @@
 package com.example.musicplayer
 
 import android.Manifest
-import android.content.ComponentName
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -12,17 +11,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.media3.session.MediaController
-import androidx.media3.session.SessionToken
 import com.example.musicplayer.data.local.SessionManager
-import com.example.musicplayer.player.PlaybackService
 import com.example.musicplayer.ui.navigation.AppNavGraph
+import com.example.musicplayer.ui.theme.MusicPlayerTheme
 import com.example.musicplayer.viewmodel.ThemeViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -37,10 +32,6 @@ class MainActivity : ComponentActivity() {
         actionBar?.hide()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-        // THE NOTIFICATION FIX: Force Android to attach the media session to your OS on startup
-        val sessionToken = SessionToken(this, ComponentName(this, PlaybackService::class.java))
-        MediaController.Builder(this, sessionToken).buildAsync()
 
         val requestPermissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
@@ -61,9 +52,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeViewModel: ThemeViewModel = hiltViewModel()
             val isDarkMode by themeViewModel.isDarkMode.collectAsState()
-            val colors = if (isDarkMode) darkColorScheme() else lightColorScheme()
 
-            MaterialTheme(colorScheme = colors) {
+            // FIXED: Using your custom MusicPlayerTheme!
+            MusicPlayerTheme(darkTheme = isDarkMode, dynamicColor = false) {
                 Surface(
                     modifier = Modifier.fillMaxSize().systemBarsPadding(),
                     color = MaterialTheme.colorScheme.background
