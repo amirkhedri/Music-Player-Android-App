@@ -101,7 +101,6 @@ fun MainScreen(
         else songs.filter { it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true) }
     }
 
-    // NEW: Proper filtering for the Favorites tab!
     val displayedFavoriteSongs = remember(favoriteSongs, searchQuery) {
         if (searchQuery.isBlank()) favoriteSongs
         else favoriteSongs.filter { it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true) }
@@ -112,7 +111,6 @@ fun MainScreen(
             TopAppBar(
                 title = { Text(text = when(selectedTab) { 0 -> "Library"; 1 -> "Favorites"; else -> "Playlists" }, fontWeight = FontWeight.ExtraBold, fontSize = 28.sp) },
                 actions = {
-                    // FIX: Search icon now shows on Tab 0 (Library) and Tab 1 (Favorites)
                     if (selectedTab == 0 || selectedTab == 1 || (selectedTab == 2 && selectedPlaylist != null)) {
                         IconButton(onClick = { isSearchExpanded = !isSearchExpanded }) { Icon(Icons.Default.Search, contentDescription = "Search") }
                     }
@@ -133,7 +131,7 @@ fun MainScreen(
                     selectedTab = tab
                     selectedPlaylist = null
                     isSearchExpanded = false
-                    searchQuery = "" // Clears search when switching tabs for a clean UX
+                    searchQuery = ""
                 }
             )
         }
@@ -166,7 +164,6 @@ fun MainScreen(
                     }
                 }
                 1 -> Column {
-                    // FIX: Search Bar added to Favorites!
                     AnimatedVisibility(visible = isSearchExpanded) {
                         OutlinedTextField(
                             value = searchQuery, onValueChange = { searchQuery = it }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -186,7 +183,6 @@ fun MainScreen(
                         }
                     } else {
                         LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 120.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            // Uses the properly filtered list now
                             itemsIndexed(displayedFavoriteSongs) { index, song ->
                                 SongCard(
                                     song = song, isFavorite = true, isCurrentlyPlaying = currentSong?.id == song.id, isPlaying = isPlaying,
@@ -198,7 +194,6 @@ fun MainScreen(
                 }
                 2 -> {
                     if (selectedPlaylist == null) {
-                        // FIX: Changed from Grid to Apple Music/Spotify style vertical List
                         LazyColumn(
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 120.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -218,7 +213,7 @@ fun MainScreen(
                             } else {
                                 items(customPlaylists.keys.toList()) { playlistName ->
                                     val songCount = customPlaylists[playlistName]?.size ?: 0
-                                    val firstSong = customPlaylists[playlistName]?.firstOrNull() // Pulls the first song's data for the cover
+                                    val firstSong = customPlaylists[playlistName]?.firstOrNull()
 
                                     Row(
                                         modifier = Modifier
@@ -229,7 +224,6 @@ fun MainScreen(
                                             .padding(12.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        // Premium Album Art Cover for the Playlist
                                         Box(
                                             modifier = Modifier
                                                 .size(64.dp)
@@ -255,7 +249,6 @@ fun MainScreen(
                                             Text(text = "$songCount songs", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
 
-                                        // Large, properly sized Edit and Delete buttons
                                         IconButton(onClick = { playlistToRename = playlistName; renamePlaylistName = playlistName }, modifier = Modifier.size(48.dp)) {
                                             Icon(Icons.Default.Edit, "Edit", tint = MaterialTheme.colorScheme.primary)
                                         }
@@ -316,7 +309,8 @@ fun MainScreen(
                     onClick = { navController.navigate("player") },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
+                        // THE GAP FIX: Changed bottom padding to 0.dp
+                        .padding(bottom = 0.dp, start = 16.dp, end = 16.dp)
                         .shadow(16.dp, RoundedCornerShape(24.dp))
                 )
             }
@@ -362,19 +356,18 @@ fun MainScreen(
 // CUSTOM UI COMPONENTS
 // ---------------------------------------------------------
 
-// FIX: Floating, Curvy Navigation Bar
 @Composable
 fun PremiumBottomBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 16.dp) // Creates the floating effect
+            .padding(horizontal = 24.dp, vertical = 16.dp)
             .navigationBarsPadding(),
         contentAlignment = Alignment.Center
     ) {
         Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f), // Dark, glassy feel
-            shape = RoundedCornerShape(32.dp), // Extremely curvy pill shape
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+            shape = RoundedCornerShape(32.dp),
             modifier = Modifier.shadow(24.dp, RoundedCornerShape(32.dp), spotColor = MaterialTheme.colorScheme.primary)
         ) {
             Row(
