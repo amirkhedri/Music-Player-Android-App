@@ -23,18 +23,15 @@ enum class SortOrder { TITLE, ARTIST }
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
-    // THE FIX: Removed 'private val' so the annotation cleanly targets the parameter
     @ApplicationContext context: Context
 ) : ViewModel() {
 
-    // --- State ---
     private val _allSongs = MutableStateFlow<List<Song>>(emptyList())
     val allSongs: StateFlow<List<Song>> = _allSongs
 
     private val _sortOrder = MutableStateFlow(SortOrder.TITLE)
     val sortOrder: StateFlow<SortOrder> = _sortOrder
 
-    // --- OS Level Deletion State ---
     private val _deletePendingIntent = MutableSharedFlow<IntentSender>()
     val deletePendingIntent = _deletePendingIntent.asSharedFlow()
 
@@ -44,8 +41,6 @@ class LibraryViewModel @Inject constructor(
         scanDeviceForMusic(context)
     }
 
-    // --- The Core Scanner Logic ---
-    // THE FIX: Suppressed the spell checker warning for the word "albumart"
     @Suppress("SpellCheckingInspection")
     private fun scanDeviceForMusic(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -64,7 +59,6 @@ class LibraryViewModel @Inject constructor(
                 MediaStore.Audio.Media.ALBUM_ID
             )
 
-            // Only grab actual music files (ignore voice memos, ringtones, etc.)
             val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
             val sort = "${MediaStore.Audio.Media.TITLE} ASC"
 
@@ -82,13 +76,13 @@ class LibraryViewModel @Inject constructor(
                     val duration = cursor.getLong(durationColumn)
                     val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
 
-                    // THE FIX: Used the .toUri() extension function instead of Uri.parse()
                     val albumArtworkUri = "content://media/external/audio/albumart/${cursor.getLong(albumIdColumn)}".toUri()
 
-                    // THE FIX: Passed 'id' directly as a Long instead of id.toString()
+                    // Inside LibraryViewModel.kt -> scanDeviceForMusic()
+
                     songsList.add(
                         Song(
-                            id = id,
+                            id = id, // THE FIX: Removed .toString() so it passes the raw Long
                             title = title,
                             artist = artist,
                             uri = uri,
@@ -99,7 +93,6 @@ class LibraryViewModel @Inject constructor(
                 }
             }
 
-            // Push the loaded songs to the UI
             _allSongs.value = songsList
             applySorting(_sortOrder.value)
         }
@@ -118,11 +111,8 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
-    // --- OS Level Deletion Logic ---
     fun requestDelete(context: Context, songs: List<Song>) {
         songsAwaitingDeletion = songs
-
-        // THE FIX: Replaced Uri.parse() with .toUri() extension
         val uris = songs.map { it.uri.toString().toUri() }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -142,11 +132,9 @@ class LibraryViewModel @Inject constructor(
 
     fun confirmDatabaseDeletion() {
         viewModelScope.launch {
-            // Remove the physically deleted songs from the UI state instantly
             val currentList = _allSongs.value.toMutableList()
             currentList.removeAll(songsAwaitingDeletion)
             _allSongs.value = currentList
-
             songsAwaitingDeletion = emptyList()
         }
     }

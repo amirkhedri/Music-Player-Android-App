@@ -1,6 +1,7 @@
 package com.example.musicplayer.ui.screens.player
 
 import android.annotation.SuppressLint
+import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -9,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,13 +24,15 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.musicplayer.viewmodel.FavoriteViewModel
 import com.example.musicplayer.viewmodel.PlayerViewModel
+import com.example.musicplayer.viewmodel.RepeatState
 
 @SuppressLint("DefaultLocale")
 fun formatTime(ms: Long): String {
@@ -41,12 +45,23 @@ fun formatTime(ms: Long): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlayerScreen(navController: NavController, playerViewModel: PlayerViewModel) {
+fun PlayerScreen(
+    navController: NavController,
+    playerViewModel: PlayerViewModel,
+    favoriteViewModel: FavoriteViewModel = hiltViewModel()
+) {
+    val context = LocalContext.current
     val song by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val position by playerViewModel.currentPosition.collectAsState()
     val isShuffle by playerViewModel.isShuffleEnabled.collectAsState()
     val realDuration by playerViewModel.duration.collectAsState()
+
+    // THE FIX: Reading the custom RepeatState
+    val repeatState by playerViewModel.repeatState.collectAsState()
+
+    val favoriteSongs by favoriteViewModel.favoriteSongs.collectAsState()
+    val isFavorite = favoriteSongs.any { it.id == song?.id }
 
     var sliderPosition by remember { mutableFloatStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
@@ -126,7 +141,7 @@ fun PlayerScreen(navController: NavController, playerViewModel: PlayerViewModel)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
                         Text(
@@ -145,7 +160,18 @@ fun PlayerScreen(navController: NavController, playerViewModel: PlayerViewModel)
                             modifier = Modifier.basicMarquee()
                         )
                     }
-                    PlayingVisualizer(isPlaying = isPlaying)
+
+                    IconButton(
+                        onClick = { song?.let { favoriteViewModel.toggleFavorite(it) } },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = "Favorite",
+                            tint = if (isFavorite) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
@@ -176,6 +202,19 @@ fun PlayerScreen(navController: NavController, playerViewModel: PlayerViewModel)
                     }
                 }
 
+                // THE FIX: Accurate Icon mapping for your specific states
+                val repeatIcon = when (repeatState) {
+                    RepeatState.ONCE -> Icons.Default.RepeatOne
+                    RepeatState.TOTALLY -> Icons.Default.Repeat
+                    else -> Icons.Default.Repeat
+                }
+
+                val repeatTint = if (repeatState == RepeatState.OFF) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.primary
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, top = 24.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -198,8 +237,21 @@ fun PlayerScreen(navController: NavController, playerViewModel: PlayerViewModel)
                     IconButton(onClick = { playerViewModel.skipNext() }, modifier = Modifier.size(56.dp)) {
                         Icon(Icons.Default.SkipNext, "Next", modifier = Modifier.size(40.dp))
                     }
-                    IconButton(onClick = { }, enabled = false, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Default.MoreVert, "More", tint = Color.Transparent)
+
+                    // THE FIX: Explicit Toast Messages
+                    IconButton(
+                        onClick = {
+                            val newState = playerViewModel.toggleRepeatMode()
+                            val msg = when(newState) {
+                                RepeatState.ONCE -> "Repeat: Once"
+                                RepeatState.TOTALLY -> "Repeat: Totally"
+                                else -> "Repeat: Off"
+                            }
+                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(repeatIcon, "Repeat", tint = repeatTint, modifier = Modifier.size(28.dp))
                     }
                 }
             }
@@ -236,26 +288,5 @@ fun PremiumProgressBar(progress: Float, max: Float, onProgressChanged: (Float) -
             valueRange = 0f..max,
             modifier = Modifier.fillMaxWidth().alpha(0f)
         )
-    }
-}
-
-@Composable
-fun PlayingVisualizer(isPlaying: Boolean) {
-    val infiniteTransition = rememberInfiniteTransition(label = "eq_transition")
-    val heights = List(4) { index ->
-        infiniteTransition.animateFloat(
-            initialValue = 0.2f, targetValue = 1f,
-            animationSpec = infiniteRepeatable(animation = tween(durationMillis = 300 + (index * 150), easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
-            label = "bar_$index"
-        )
-    }
-    val animatedHeights = heights.map { heightState ->
-        animateFloatAsState(targetValue = if (isPlaying) heightState.value else 0.2f, animationSpec = tween(durationMillis = 300), label = "pause_settle")
-    }
-
-    Row(modifier = Modifier.height(28.dp).padding(bottom = 6.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        animatedHeights.forEach { animatedHeight ->
-            Box(modifier = Modifier.width(4.dp).fillMaxHeight(animatedHeight.value).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
-        }
     }
 }

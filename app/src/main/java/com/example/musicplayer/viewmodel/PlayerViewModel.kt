@@ -7,63 +7,73 @@ import androidx.media3.common.Player
 import com.example.musicplayer.data.model.Song
 import com.example.musicplayer.player.PlayerController
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+enum class RepeatState { OFF, ONCE, TOTALLY }
 
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val playerController: PlayerController
 ) : ViewModel() {
 
+    private val exoPlayer = playerController.exoPlayer
+
     private val _currentSong = MutableStateFlow<Song?>(null)
-    val currentSong: StateFlow<Song?> = _currentSong.asStateFlow()
+    val currentSong: StateFlow<Song?> = _currentSong
 
     private val _isPlaying = MutableStateFlow(false)
-    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+    val isPlaying: StateFlow<Boolean> = _isPlaying
 
-    private var currentQueue: List<Song> = emptyList()
-
-    private val _currentPosition = MutableStateFlow(0L)
-    val currentPosition: StateFlow<Long> = _currentPosition.asStateFlow()
+    private val _currentPosition = MutableStateFlow(0f)
+    val currentPosition: StateFlow<Float> = _currentPosition
 
     private val _duration = MutableStateFlow(0L)
-    val duration: StateFlow<Long> = _duration.asStateFlow()
+    val duration: StateFlow<Long> = _duration
 
     private val _isShuffleEnabled = MutableStateFlow(false)
-    val isShuffleEnabled: StateFlow<Boolean> = _isShuffleEnabled.asStateFlow()
+    val isShuffleEnabled: StateFlow<Boolean> = _isShuffleEnabled
+
+    private val _repeatState = MutableStateFlow(RepeatState.OFF)
+    val repeatState: StateFlow<RepeatState> = _repeatState
+
+    private var progressJob: Job? = null
+    private var currentQueue: List<Song> = emptyList()
 
     init {
-        playerController.exoPlayer.addListener(object : Player.Listener {
+        _isShuffleEnabled.value = exoPlayer.shuffleModeEnabled
 
-            // THE FIX: Listen to ExoPlayer changing tracks automatically
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                val playingUri = mediaItem?.localConfiguration?.uri?.toString()
-                val song = currentQueue.find { it.uri.toString() == playingUri }
-                if (song != null) {
-                    _currentSong.value = song
-                    _duration.value = 0L
-                }
-            }
-
+        exoPlayer.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isPlaying.value = isPlaying
+                if (isPlaying) startProgressTracker() else stopProgressTracker()
+            }
+
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                // Auto-transition logic
+                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
+                    if (_repeatState.value == RepeatState.ONCE) {
+                        _repeatState.value = RepeatState.OFF
+                        exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
+                    }
+                }
+                updateCurrentSong(mediaItem)
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) {
+                    _duration.value = exoPlayer.duration.coerceAtLeast(0L)
+                }
+            }
+
+            override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+                _isShuffleEnabled.value = shuffleModeEnabled
             }
         })
-
-        viewModelScope.launch {
-            while (true) {
-                if (_isPlaying.value) {
-                    _currentPosition.value = playerController.exoPlayer.currentPosition
-                    val actualDuration = playerController.exoPlayer.duration
-                    if (actualDuration > 0) _duration.value = actualDuration
-                }
-                delay(1000)
-            }
-        }
     }
 
     fun playQueue(songs: List<Song>, startIndex: Int) {
@@ -72,21 +82,110 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun togglePlayPause() {
-        if (_isPlaying.value) playerController.exoPlayer.pause()
-        else playerController.exoPlayer.play()
+        if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+    }
+
+    // THE FIX: Hijacked Skip Next logic
+    fun skipNext() {
+        when (_repeatState.value) {
+            RepeatState.TOTALLY -> {
+                // Lock user into this song, just restart it
+                exoPlayer.seekTo(0L)
+            }
+            RepeatState.ONCE -> {
+                // Restart this song exactly once, then turn repeat off
+                _repeatState.value = RepeatState.OFF
+                exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
+                exoPlayer.seekTo(0L)
+            }
+            RepeatState.OFF -> {
+                // Normal next track behavior
+                val nextIndex = exoPlayer.currentMediaItemIndex + 1
+                if (nextIndex < exoPlayer.mediaItemCount) {
+                    exoPlayer.seekTo(nextIndex, 0L)
+                } else {
+                    exoPlayer.seekTo(0, 0L)
+                    exoPlayer.pause()
+                }
+            }
+        }
+    }
+
+    // THE FIX: Hijacked Skip Previous logic to match
+    fun skipPrevious() {
+        when (_repeatState.value) {
+            RepeatState.TOTALLY -> {
+                exoPlayer.seekTo(0L)
+            }
+            RepeatState.ONCE -> {
+                _repeatState.value = RepeatState.OFF
+                exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
+                exoPlayer.seekTo(0L)
+            }
+            RepeatState.OFF -> {
+                val prevIndex = exoPlayer.currentMediaItemIndex - 1
+                if (prevIndex >= 0) {
+                    exoPlayer.seekTo(prevIndex, 0L)
+                } else {
+                    exoPlayer.seekTo(0, 0L)
+                }
+            }
+        }
+    }
+
+    fun seekTo(positionMs: Long) {
+        exoPlayer.seekTo(positionMs)
+        _currentPosition.value = positionMs.toFloat()
     }
 
     fun toggleShuffle() {
-        _isShuffleEnabled.value = !_isShuffleEnabled.value
-        playerController.exoPlayer.shuffleModeEnabled = _isShuffleEnabled.value
+        exoPlayer.shuffleModeEnabled = !exoPlayer.shuffleModeEnabled
     }
 
-    // THE FIX: Let ExoPlayer handle skipping so the Notification stays in sync
-    fun skipNext() { playerController.exoPlayer.seekToNext() }
-    fun skipPrevious() { playerController.exoPlayer.seekToPrevious() }
+    fun toggleRepeatMode(): RepeatState {
+        val nextState = when (_repeatState.value) {
+            RepeatState.OFF -> {
+                exoPlayer.repeatMode = Player.REPEAT_MODE_ONE
+                RepeatState.ONCE
+            }
+            RepeatState.ONCE -> {
+                exoPlayer.repeatMode = Player.REPEAT_MODE_ONE
+                RepeatState.TOTALLY
+            }
+            RepeatState.TOTALLY -> {
+                exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
+                RepeatState.OFF
+            }
+        }
+        _repeatState.value = nextState
+        return nextState
+    }
 
-    fun seekTo(position: Long) {
-        playerController.exoPlayer.seekTo(position)
-        _currentPosition.value = position
+    private fun updateCurrentSong(mediaItem: MediaItem?) {
+        if (mediaItem == null) return
+        val songId = mediaItem.mediaId
+        _currentSong.value = currentQueue.find { it.uri.toString() == songId }
+        _duration.value = exoPlayer.duration.coerceAtLeast(0L)
+        _currentPosition.value = 0f
+    }
+
+    private fun startProgressTracker() {
+        progressJob?.cancel()
+        progressJob = viewModelScope.launch {
+            while (true) {
+                _currentPosition.value = exoPlayer.currentPosition.toFloat()
+                delay(1000L)
+            }
+        }
+    }
+
+    private fun stopProgressTracker() {
+        progressJob?.cancel()
+        _currentPosition.value = exoPlayer.currentPosition.toFloat()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopProgressTracker()
     }
 }

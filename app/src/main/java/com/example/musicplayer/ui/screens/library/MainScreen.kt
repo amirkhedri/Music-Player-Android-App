@@ -11,7 +11,7 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -39,6 +39,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -57,7 +58,6 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.musicplayer.data.model.Song
-import com.example.musicplayer.ui.screens.player.PlayingVisualizer
 import com.example.musicplayer.viewmodel.*
 
 fun shareSongs(context: Context, songs: List<Song>) {
@@ -142,14 +142,6 @@ fun MainScreen(
         }
     }
 
-    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-        val permissionLauncher = rememberLauncherForActivityResult(
-            contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-            onResult = { }
-        )
-        LaunchedEffect(Unit) { permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) }
-    }
-
     val songs by libraryViewModel.allSongs.collectAsState()
     val sortOrder by libraryViewModel.sortOrder.collectAsState()
     val favoriteSongs by favoriteViewModel.favoriteSongs.collectAsState()
@@ -213,7 +205,11 @@ fun MainScreen(
                         IconButton(onClick = { themeViewModel.toggleTheme() }) {
                             Icon(imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode, contentDescription = "Toggle Theme")
                         }
-                        IconButton(onClick = { authViewModel.logout(); navController.navigate("login") { popUpTo(0) } }) {
+                        IconButton(onClick = {
+                            if (isPlaying) playerViewModel.togglePlayPause()
+                            authViewModel.logout()
+                            navController.navigate("login") { popUpTo(0) }
+                        }) {
                             Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Logout", tint = MaterialTheme.colorScheme.error)
                         }
                     },
@@ -259,15 +255,10 @@ fun MainScreen(
                                 song = song, isFavorite = favoriteSongs.any { it.id == song.id }, isCurrentlyPlaying = currentSong?.id == song.id, isPlaying = isPlaying,
                                 isSelectionMode = isSelectionMode, isSelected = selectedSongUris.contains(song.uri.toString()),
                                 onFavoriteToggle = { favoriteViewModel.toggleFavorite(song) }, onAddToPlaylist = { songToAdd = song },
-                                onLongClick = {
-                                    selectedSongUris = if (selectedSongUris.contains(song.uri.toString())) selectedSongUris - song.uri.toString() else selectedSongUris + song.uri.toString()
-                                },
+                                onLongClick = { selectedSongUris = if (selectedSongUris.contains(song.uri.toString())) selectedSongUris - song.uri.toString() else selectedSongUris + song.uri.toString() },
                                 onClick = {
-                                    if (isSelectionMode) {
-                                        selectedSongUris = if (selectedSongUris.contains(song.uri.toString())) selectedSongUris - song.uri.toString() else selectedSongUris + song.uri.toString()
-                                    } else {
-                                        playerViewModel.playQueue(displayedSongs, index)
-                                    }
+                                    if (isSelectionMode) selectedSongUris = if (selectedSongUris.contains(song.uri.toString())) selectedSongUris - song.uri.toString() else selectedSongUris + song.uri.toString()
+                                    else playerViewModel.playQueue(displayedSongs, index)
                                 }
                             )
                         }
@@ -499,27 +490,6 @@ fun MainScreen(
             }
         }
 
-        // --- DIALOGS ---
-
-        if (songToDelete != null) {
-            AlertDialog(
-                onDismissRequest = { songToDelete = null },
-                icon = { Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(48.dp)) },
-                title = { Text("Delete Song") },
-                text = { Text("Are you sure you want to delete '${songToDelete!!.title}'? This action cannot be undone.") },
-                confirmButton = {
-                    Button(
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                        onClick = {
-                            libraryViewModel.requestDelete(context, listOf(songToDelete!!))
-                            songToDelete = null
-                        }
-                    ) { Text("Delete", color = MaterialTheme.colorScheme.onError) }
-                },
-                dismissButton = { TextButton(onClick = { songToDelete = null }) { Text("Cancel") } }
-            )
-        }
-
         if (showBulkDeleteDialog) {
             AlertDialog(
                 onDismissRequest = { showBulkDeleteDialog = false },
@@ -577,10 +547,6 @@ fun MainScreen(
         }
     }
 }
-
-// ---------------------------------------------------------
-// CUSTOM UI COMPONENTS
-// ---------------------------------------------------------
 
 @Composable
 fun PremiumBottomBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
@@ -706,6 +672,27 @@ fun MiniPlayer(
             IconButton(onClick = onSkipPrevious) { Icon(Icons.Default.SkipPrevious, null, tint = MaterialTheme.colorScheme.onPrimaryContainer) }
             IconButton(onClick = onPlayPause) { Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(32.dp)) }
             IconButton(onClick = onSkipNext) { Icon(Icons.Default.SkipNext, null, tint = MaterialTheme.colorScheme.onPrimaryContainer) }
+        }
+    }
+}
+
+@Composable
+fun PlayingVisualizer(isPlaying: Boolean) {
+    val infiniteTransition = rememberInfiniteTransition(label = "eq_transition")
+    val heights = List(4) { index ->
+        infiniteTransition.animateFloat(
+            initialValue = 0.2f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(animation = tween(durationMillis = 300 + (index * 150), easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+            label = "bar_$index"
+        )
+    }
+    val animatedHeights = heights.map { heightState ->
+        animateFloatAsState(targetValue = if (isPlaying) heightState.value else 0.2f, animationSpec = tween(durationMillis = 300), label = "pause_settle")
+    }
+
+    Row(modifier = Modifier.height(28.dp).padding(bottom = 6.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        animatedHeights.forEach { animatedHeight ->
+            Box(modifier = Modifier.width(4.dp).fillMaxHeight(animatedHeight.value).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
         }
     }
 }
