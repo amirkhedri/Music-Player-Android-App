@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -27,12 +29,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.media3.common.Player
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.musicplayer.viewmodel.FavoriteViewModel
 import com.example.musicplayer.viewmodel.PlayerViewModel
 import com.example.musicplayer.viewmodel.RepeatState
+import com.example.musicplayer.viewmodel.EqualizerViewModel
 
 @SuppressLint("DefaultLocale")
 fun formatTime(ms: Long): String {
@@ -48,7 +52,8 @@ fun formatTime(ms: Long): String {
 fun PlayerScreen(
     navController: NavController,
     playerViewModel: PlayerViewModel,
-    favoriteViewModel: FavoriteViewModel = hiltViewModel()
+    favoriteViewModel: FavoriteViewModel = hiltViewModel(),
+    equalizerViewModel: EqualizerViewModel = hiltViewModel() // NEW: EQ ViewModel
 ) {
     val context = LocalContext.current
     val song by playerViewModel.currentSong.collectAsState()
@@ -56,8 +61,6 @@ fun PlayerScreen(
     val position by playerViewModel.currentPosition.collectAsState()
     val isShuffle by playerViewModel.isShuffleEnabled.collectAsState()
     val realDuration by playerViewModel.duration.collectAsState()
-
-    // THE FIX: Reading the custom RepeatState
     val repeatState by playerViewModel.repeatState.collectAsState()
 
     val favoriteSongs by favoriteViewModel.favoriteSongs.collectAsState()
@@ -65,6 +68,9 @@ fun PlayerScreen(
 
     var sliderPosition by remember { mutableFloatStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
+
+    // EQ Bottom Sheet State
+    var showEqSheet by remember { mutableStateOf(false) }
 
     val animatedProgress by animateFloatAsState(
         targetValue = sliderPosition,
@@ -94,6 +100,12 @@ fun PlayerScreen(
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    // NEW: EQ Button
+                    IconButton(onClick = { showEqSheet = true }) {
+                        Icon(Icons.Default.Tune, contentDescription = "Equalizer", tint = MaterialTheme.colorScheme.primary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -202,7 +214,6 @@ fun PlayerScreen(
                     }
                 }
 
-                // THE FIX: Accurate Icon mapping for your specific states
                 val repeatIcon = when (repeatState) {
                     RepeatState.ONCE -> Icons.Default.RepeatOne
                     RepeatState.TOTALLY -> Icons.Default.Repeat
@@ -238,8 +249,6 @@ fun PlayerScreen(
                         Icon(Icons.Default.SkipNext, "Next", modifier = Modifier.size(40.dp))
                     }
 
-                    // THE FIX: Explicit Toast Messages
-// Clean, premium Repeat Button (No Text/Toasts)
                     IconButton(
                         onClick = { playerViewModel.toggleRepeatMode() },
                         modifier = Modifier.size(48.dp)
@@ -249,8 +258,133 @@ fun PlayerScreen(
                 }
             }
         }
+
+        // NEW: Equalizer Bottom Sheet
+        if (showEqSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showEqSheet = false },
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                EqualizerContent(equalizerViewModel)
+            }
+        }
     }
 }
+
+// ------------------------------------------------------------------
+// EQUALIZER COMPONENTS
+// ------------------------------------------------------------------
+
+@Composable
+fun EqualizerContent(viewModel: EqualizerViewModel) {
+    val isEnabled by viewModel.isEqEnabled.collectAsState()
+    val presets by viewModel.presets.collectAsState()
+    val currentPreset by viewModel.currentPreset.collectAsState()
+    val bands by viewModel.bands.collectAsState()
+    val minLevel by viewModel.minBandLevel.collectAsState()
+    val maxLevel by viewModel.maxBandLevel.collectAsState()
+
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 24.dp, end = 24.dp, bottom = 48.dp, top = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Header & Enable Toggle
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Equalizer", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Switch(
+                checked = isEnabled,
+                onCheckedChange = { viewModel.toggleEqualizer(it) }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Preset Dropdown
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = { expanded = true },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = isEnabled
+            ) {
+                Text(currentPreset ?: "Select Preset", color = if (isEnabled) MaterialTheme.colorScheme.primary else Color.Gray)
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(Icons.Default.ArrowDropDown, null)
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.fillMaxWidth(0.8f)
+            ) {
+                presets.forEach { preset ->
+                    DropdownMenuItem(
+                        text = { Text(preset) },
+                        onClick = {
+                            viewModel.setPreset(preset)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Band Sliders (Using Compose Custom Layout Trick for Vertical Sliders)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Bottom
+        ) {
+            bands.forEach { band ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+
+                    // The Custom Vertical Slider
+                    Box(
+                        modifier = Modifier
+                            .width(40.dp)
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Slider(
+                            value = band.level.toFloat(),
+                            onValueChange = { viewModel.setBandLevel(band.index, it.toInt().toShort()) },
+                            valueRange = minLevel.toFloat()..maxLevel.toFloat(),
+                            enabled = isEnabled,
+                            modifier = Modifier
+                                .requiredWidth(200.dp) // Width dictates the height of the vertical slider
+                                .requiredHeight(40.dp)
+                                .graphicsLayer {
+                                    rotationZ = -90f // Rotate it to stand up
+                                }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Frequency Label (e.g., "60 Hz", "14 kHz")
+                    Text(
+                        text = if (band.centerFreqHz >= 1000) "${band.centerFreqHz / 1000}k" else "${band.centerFreqHz}",
+                        fontSize = 12.sp,
+                        color = if (isEnabled) MaterialTheme.colorScheme.onSurface else Color.Gray,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------------
+// EXISTING COMPONENTS
+// ------------------------------------------------------------------
 
 @Composable
 fun PremiumProgressBar(progress: Float, max: Float, onProgressChanged: (Float) -> Unit, onDragFinished: () -> Unit) {

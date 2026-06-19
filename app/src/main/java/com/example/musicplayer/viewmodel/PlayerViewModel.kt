@@ -16,8 +16,11 @@ import javax.inject.Inject
 
 enum class RepeatState { OFF, ONCE, TOTALLY }
 
+// THE FIX: Explicitly opt-in to Media3's advanced features
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
+    // THE FIX: Put 'private val' back so the rest of the class can see it!
     private val playerController: PlayerController
 ) : ViewModel() {
 
@@ -54,13 +57,18 @@ class PlayerViewModel @Inject constructor(
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                // Auto-transition logic
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
                     if (_repeatState.value == RepeatState.ONCE) {
                         _repeatState.value = RepeatState.OFF
                         exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
                     }
+                } else if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK || reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                    if (_repeatState.value == RepeatState.ONCE) {
+                        _repeatState.value = RepeatState.OFF
+                        exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
+                    }
                 }
+
                 updateCurrentSong(mediaItem)
             }
 
@@ -85,21 +93,17 @@ class PlayerViewModel @Inject constructor(
         if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
     }
 
-    // THE FIX: Hijacked Skip Next logic
     fun skipNext() {
         when (_repeatState.value) {
             RepeatState.TOTALLY -> {
-                // Lock user into this song, just restart it
                 exoPlayer.seekTo(0L)
             }
             RepeatState.ONCE -> {
-                // Restart this song exactly once, then turn repeat off
                 _repeatState.value = RepeatState.OFF
                 exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
                 exoPlayer.seekTo(0L)
             }
             RepeatState.OFF -> {
-                // Normal next track behavior
                 val nextIndex = exoPlayer.currentMediaItemIndex + 1
                 if (nextIndex < exoPlayer.mediaItemCount) {
                     exoPlayer.seekTo(nextIndex, 0L)
@@ -111,7 +115,6 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    // THE FIX: Hijacked Skip Previous logic to match
     fun skipPrevious() {
         when (_repeatState.value) {
             RepeatState.TOTALLY -> {
