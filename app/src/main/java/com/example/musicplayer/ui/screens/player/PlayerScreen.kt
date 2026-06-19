@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -403,7 +404,6 @@ fun EqualizerContent(viewModel: EqualizerViewModel) {
             .padding(bottom = 48.dp, top = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Title & Switch Header
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -422,9 +422,8 @@ fun EqualizerContent(viewModel: EqualizerViewModel) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // THE FIX: Premium Horizontal Preset Bank (Replaces Dropdown)
+        // Premium Horizontal Preset Bank
         Column(modifier = Modifier.fillMaxWidth()) {
-            // THE FIX: Chaining the padding modifiers instead of mixing them
             Text(
                 text = "PRESETS",
                 fontSize = 11.sp,
@@ -433,7 +432,7 @@ fun EqualizerContent(viewModel: EqualizerViewModel) {
                 letterSpacing = 1.5.sp,
                 modifier = Modifier
                     .padding(horizontal = 24.dp)
-                    .padding(bottom = 12.dp)
+                    .padding(bottom = 12.dp) // THE FIX: Chained padding modifiers
             )
 
             LazyRow(
@@ -452,13 +451,13 @@ fun EqualizerContent(viewModel: EqualizerViewModel) {
                         label = "text_color"
                     )
                     val animatedBgColor by animateColorAsState(
-                        targetValue = if (isSelected && isEnabled) Color.Black.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if(isEnabled) 0.5f else 0.2f),
+                        targetValue = if (isSelected && isEnabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if(isEnabled) 0.5f else 0.2f),
                         label = "bg_color"
                     )
 
                     Box(
                         modifier = Modifier
-                            .shadow(if (isSelected && isEnabled) 8.dp else 0.dp, RoundedCornerShape(20.dp), spotColor = MaterialTheme.colorScheme.primary)
+                            // THE FIX: Removed the shadow() here entirely to fix the black artifact line
                             .clip(RoundedCornerShape(20.dp))
                             .background(animatedBgColor)
                             .border(2.dp, animatedBorderColor, RoundedCornerShape(20.dp))
@@ -470,7 +469,8 @@ fun EqualizerContent(viewModel: EqualizerViewModel) {
                             text = preset,
                             color = animatedTextColor,
                             fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
-                            fontSize = 14.sp
+                            fontSize = 14.sp,
+                            textDecoration = TextDecoration.None // THE FIX: Explicitly blocked underlines
                         )
                     }
                 }
