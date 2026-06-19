@@ -2,11 +2,16 @@ package com.example.musicplayer.ui.screens.player
 
 import android.annotation.SuppressLint
 import android.widget.Toast
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,8 +28,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,10 +55,9 @@ fun formatTime(ms: Long): String {
     return String.format("%d:%02d", minutes, seconds)
 }
 
-// NEW: Helper function to translate raw Hz into human-readable terms
 fun getFrequencyLabel(hz: Int): String {
     return when {
-        hz < 100 -> "Sub Bass"
+        hz < 100 -> "Sub"
         hz < 300 -> "Bass"
         hz < 2000 -> "Mid"
         hz < 5000 -> "Presence"
@@ -80,7 +86,6 @@ fun PlayerScreen(
 
     var sliderPosition by remember { mutableFloatStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
-
     var showEqSheet by remember { mutableStateOf(false) }
 
     val animatedProgress by animateFloatAsState(
@@ -290,6 +295,96 @@ fun PlayerScreen(
 }
 
 // ------------------------------------------------------------------
+// CUSTOM ANIMATED STUDIO FADER COMPONENT
+// ------------------------------------------------------------------
+@Composable
+fun StudioFader(
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    isEnabled: Boolean,
+    onValueChange: (Float) -> Unit
+) {
+    val heightDp = 180.dp
+    val widthDp = 44.dp
+    val thumbHeight = 24.dp
+    val density = LocalDensity.current
+    val heightPx = with(density) { heightDp.toPx() }
+
+    val fraction = ((value - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
+
+    val animatedFraction by animateFloatAsState(
+        targetValue = fraction,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioNoBouncy),
+        label = "fader_animation"
+    )
+
+    Box(
+        modifier = Modifier
+            .width(widthDp)
+            .height(heightDp)
+            .pointerInput(isEnabled) {
+                if (!isEnabled) return@pointerInput
+                detectVerticalDragGestures(
+                    onDragStart = { offset ->
+                        val newFraction = 1f - (offset.y / heightPx).coerceIn(0f, 1f)
+                        val newValue = valueRange.start + (newFraction * (valueRange.endInclusive - valueRange.start))
+                        onValueChange(newValue)
+                    },
+                    onVerticalDrag = { change, _ ->
+                        val newFraction = 1f - (change.position.y / heightPx).coerceIn(0f, 1f)
+                        val newValue = valueRange.start + (newFraction * (valueRange.endInclusive - valueRange.start))
+                        onValueChange(newValue)
+                    }
+                )
+            }
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .width(8.dp)
+                .fillMaxHeight()
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+        )
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .width(8.dp)
+                .fillMaxHeight(animatedFraction)
+                .clip(CircleShape)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
+                    )
+                )
+                .shadow(if (isEnabled && animatedFraction > 0.1f) 8.dp else 0.dp, spotColor = MaterialTheme.colorScheme.primary)
+        )
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = (heightDp - thumbHeight) * (1f - animatedFraction))
+                .width(40.dp)
+                .height(thumbHeight)
+                .shadow(elevation = if (isEnabled) 12.dp else 0.dp, shape = RoundedCornerShape(6.dp), spotColor = MaterialTheme.colorScheme.primary)
+                .clip(RoundedCornerShape(6.dp))
+                .background(if (isEnabled) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant)
+                .border(2.dp, if (isEnabled) MaterialTheme.colorScheme.primary else Color.Gray, RoundedCornerShape(6.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .width(20.dp)
+                    .height(3.dp)
+                    .clip(CircleShape)
+                    .background(if (isEnabled) MaterialTheme.colorScheme.primary else Color.Gray)
+            )
+        }
+    }
+}
+
+// ------------------------------------------------------------------
 // PREMIUM STUDIO MIXER EQUALIZER UI
 // ------------------------------------------------------------------
 
@@ -302,14 +397,13 @@ fun EqualizerContent(viewModel: EqualizerViewModel) {
     val minLevel by viewModel.minBandLevel.collectAsState()
     val maxLevel by viewModel.maxBandLevel.collectAsState()
 
-    var expanded by remember { mutableStateOf(false) }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 48.dp, top = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Title & Switch Header
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -328,49 +422,57 @@ fun EqualizerContent(viewModel: EqualizerViewModel) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-            Surface(
+        // THE FIX: Premium Horizontal Preset Bank (Replaces Dropdown)
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // THE FIX: Chaining the padding modifiers instead of mixing them
+            Text(
+                text = "PRESETS",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray,
+                letterSpacing = 1.5.sp,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .clickable(enabled = isEnabled) { expanded = true },
-                color = if (isEnabled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 12.dp)
+            )
+
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("PRESET", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                items(presets) { preset ->
+                    val isSelected = preset == currentPreset
+                    val animatedBorderColor by animateColorAsState(
+                        targetValue = if (isSelected && isEnabled) MaterialTheme.colorScheme.primary else Color.Transparent,
+                        label = "border_color"
+                    )
+                    val animatedTextColor by animateColorAsState(
+                        targetValue = if (isSelected && isEnabled) MaterialTheme.colorScheme.primary else if (isEnabled) MaterialTheme.colorScheme.onSurface else Color.Gray,
+                        label = "text_color"
+                    )
+                    val animatedBgColor by animateColorAsState(
+                        targetValue = if (isSelected && isEnabled) Color.Black.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if(isEnabled) 0.5f else 0.2f),
+                        label = "bg_color"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .shadow(if (isSelected && isEnabled) 8.dp else 0.dp, RoundedCornerShape(20.dp), spotColor = MaterialTheme.colorScheme.primary)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(animatedBgColor)
+                            .border(2.dp, animatedBorderColor, RoundedCornerShape(20.dp))
+                            .clickable(enabled = isEnabled) { viewModel.setPreset(preset) }
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            text = currentPreset ?: "Select Preset",
-                            color = if (isEnabled) MaterialTheme.colorScheme.onSurface else Color.Gray,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
+                            text = preset,
+                            color = animatedTextColor,
+                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                            fontSize = 14.sp
                         )
                     }
-                    Icon(Icons.Default.ArrowDropDown, null, tint = if (isEnabled) MaterialTheme.colorScheme.primary else Color.Gray)
-                }
-            }
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.fillMaxWidth(0.85f).background(MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                presets.forEach { preset ->
-                    DropdownMenuItem(
-                        text = { Text(preset, fontWeight = if (preset == currentPreset) FontWeight.Bold else FontWeight.Normal) },
-                        onClick = {
-                            viewModel.setPreset(preset)
-                            expanded = false
-                        },
-                        trailingIcon = {
-                            if (preset == currentPreset) {
-                                Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                    )
                 }
             }
         }
@@ -379,72 +481,58 @@ fun EqualizerContent(viewModel: EqualizerViewModel) {
 
         // Studio Channel Strips (Frequency Bands)
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.Bottom
         ) {
             bands.forEach { band ->
                 val dbValue = band.level / 100
                 val dbString = if (dbValue > 0) "+$dbValue" else "$dbValue"
+                val animatedColor by animateColorAsState(if (isEnabled && dbValue != 0) MaterialTheme.colorScheme.primary else Color.Gray, label = "dbColor")
 
-                // NEW: Calculate the dynamic label (Bass, Mid, Treble)
                 val friendlyLabel = getFrequencyLabel(band.centerFreqHz)
 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isEnabled) 0.4f else 0.1f))
-                        .padding(vertical = 16.dp, horizontal = 8.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isEnabled) 0.5f else 0.1f))
+                        .padding(vertical = 16.dp, horizontal = 4.dp)
                 ) {
 
+                    // Premium Glassmorphic LCD Readout
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.background.copy(alpha = if (isEnabled) 0.8f else 0.4f))
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                            .background(Color.Black.copy(alpha = 0.8f))
+                            .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 6.dp, vertical = 6.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = dbString,
                             fontSize = 12.sp,
                             fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isEnabled) MaterialTheme.colorScheme.primary else Color.Gray
+                            fontWeight = FontWeight.ExtraBold,
+                            color = animatedColor
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                    Box(
-                        modifier = Modifier
-                            .width(40.dp)
-                            .height(160.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Slider(
-                            value = band.level.toFloat(),
-                            onValueChange = { viewModel.setBandLevel(band.index, it.toInt().toShort()) },
-                            valueRange = minLevel.toFloat()..maxLevel.toFloat(),
-                            enabled = isEnabled,
-                            colors = SliderDefaults.colors(
-                                thumbColor = MaterialTheme.colorScheme.primary,
-                                activeTrackColor = MaterialTheme.colorScheme.primary,
-                                inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            modifier = Modifier
-                                .requiredWidth(160.dp)
-                                .requiredHeight(40.dp)
-                                .graphicsLayer { rotationZ = -90f }
-                        )
-                    }
+                    // The Custom Animated Studio Fader
+                    StudioFader(
+                        value = band.level.toFloat(),
+                        valueRange = minLevel.toFloat()..maxLevel.toFloat(),
+                        isEnabled = isEnabled,
+                        onValueChange = { viewModel.setBandLevel(band.index, it.toInt().toShort()) }
+                    )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                    // NEW: Displaying the friendly text label (Bass, Treble, etc)
                     Text(
                         text = friendlyLabel,
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         color = if (isEnabled) MaterialTheme.colorScheme.primary else Color.Gray,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1
