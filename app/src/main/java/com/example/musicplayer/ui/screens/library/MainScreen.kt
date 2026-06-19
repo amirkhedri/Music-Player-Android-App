@@ -1,10 +1,14 @@
 package com.example.musicplayer.ui.screens.library
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -56,7 +60,6 @@ import com.example.musicplayer.data.model.Song
 import com.example.musicplayer.ui.screens.player.PlayingVisualizer
 import com.example.musicplayer.viewmodel.*
 
-// NEW: Helper function to share multiple songs via Android Intent
 fun shareSongs(context: Context, songs: List<Song>) {
     if (songs.isEmpty()) return
     val uris = ArrayList(songs.map { Uri.parse(it.uri.toString()) })
@@ -86,24 +89,38 @@ fun MainScreen(
 ) {
     val context = LocalContext.current
 
-    // Tab Index: 0=Library, 1=Favorites, 2=Artists, 3=Playlists
+    val deleteLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            libraryViewModel.confirmDatabaseDeletion()
+            Toast.makeText(context, "Deleted successfully", Toast.LENGTH_SHORT).show()
+        } else {
+            libraryViewModel.cancelDeletion()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        libraryViewModel.deletePendingIntent.collect { intentSender ->
+            deleteLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
+        }
+    }
+
     var selectedTab by remember { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     var isSearchExpanded by remember { mutableStateOf(false) }
 
-    // NEW: Selection Mode State
     var selectedSongUris by remember { mutableStateOf<Set<String>>(emptySet()) }
     val isSelectionMode = selectedSongUris.isNotEmpty()
 
-    // Dialog States
     var songToAdd by remember { mutableStateOf<Song?>(null) }
+    var songToDelete by remember { mutableStateOf<Song?>(null) }
     var showBulkDeleteDialog by remember { mutableStateOf(false) }
     var showPlaylistDialog by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
     var playlistToRename by remember { mutableStateOf<String?>(null) }
     var renamePlaylistName by remember { mutableStateOf("") }
 
-    // Navigation States
     var selectedPlaylist by remember { mutableStateOf<String?>(null) }
     var selectedArtist by remember { mutableStateOf<String?>(null) }
     var subScreenSearchQuery by remember { mutableStateOf("") }
@@ -161,7 +178,6 @@ fun MainScreen(
 
     Scaffold(
         topBar = {
-            // NEW: Contextual Action Bar when songs are selected
             if (isSelectionMode) {
                 TopAppBar(
                     title = { Text("${selectedSongUris.size} Selected", fontWeight = FontWeight.Bold) },
@@ -291,7 +307,7 @@ fun MainScreen(
                         }
                     }
                 }
-                2 -> { // Artists Tab
+                2 -> {
                     if (selectedArtist == null) {
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(2),
@@ -306,7 +322,6 @@ fun MainScreen(
                                 Box(
                                     modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(24.dp)).shadow(8.dp, RoundedCornerShape(24.dp)).clickable { selectedArtist = artistName }
                                 ) {
-                                    // NEW: Premium Fallback Graphic for Artists
                                     if (firstSong?.albumArtUri == null || firstSong.albumArtUri.toString().isEmpty()) {
                                         Box(
                                             modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.surfaceVariant))),
@@ -368,7 +383,7 @@ fun MainScreen(
                         }
                     }
                 }
-                3 -> { // Playlists Tab
+                3 -> {
                     if (selectedPlaylist == null) {
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(2),
@@ -485,6 +500,26 @@ fun MainScreen(
         }
 
         // --- DIALOGS ---
+
+        if (songToDelete != null) {
+            AlertDialog(
+                onDismissRequest = { songToDelete = null },
+                icon = { Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(48.dp)) },
+                title = { Text("Delete Song") },
+                text = { Text("Are you sure you want to delete '${songToDelete!!.title}'? This action cannot be undone.") },
+                confirmButton = {
+                    Button(
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                        onClick = {
+                            libraryViewModel.requestDelete(context, listOf(songToDelete!!))
+                            songToDelete = null
+                        }
+                    ) { Text("Delete", color = MaterialTheme.colorScheme.onError) }
+                },
+                dismissButton = { TextButton(onClick = { songToDelete = null }) { Text("Cancel") } }
+            )
+        }
+
         if (showBulkDeleteDialog) {
             AlertDialog(
                 onDismissRequest = { showBulkDeleteDialog = false },
@@ -495,7 +530,9 @@ fun MainScreen(
                     Button(
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                         onClick = {
-                            // TODO: Add MediaStore.createDeleteRequest logic in LibraryViewModel to delete multiple actual files
+                            val songsToDelete = songs.filter { selectedSongUris.contains(it.uri.toString()) }
+                            libraryViewModel.requestDelete(context, songsToDelete)
+
                             selectedSongUris = emptySet()
                             showBulkDeleteDialog = false
                         }
@@ -587,7 +624,7 @@ fun BottomNavItem(icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
 @Composable
 fun SongCard(
     song: Song, isFavorite: Boolean, isCurrentlyPlaying: Boolean, isPlaying: Boolean,
-    isSelectionMode: Boolean, isSelected: Boolean, // NEW: Selection Props
+    isSelectionMode: Boolean, isSelected: Boolean,
     onFavoriteToggle: () -> Unit, onAddToPlaylist: () -> Unit, onLongClick: () -> Unit,
     onRemoveFromPlaylist: (() -> Unit)? = null,
     onClick: () -> Unit
@@ -603,7 +640,6 @@ fun SongCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(bgColor)
-            // NEW: combinedClickable replaces standard clickable to enable long-pressing
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
@@ -617,7 +653,6 @@ fun SongCard(
             } else {
                 AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(song.albumArtUri).crossfade(true).build(), contentDescription = null, contentScale = ContentScale.Crop, error = fallbackIcon, fallback = fallbackIcon, modifier = Modifier.fillMaxSize())
             }
-            // NEW: Selection Checkmark Overlay
             if (isSelected) {
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)), contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
@@ -640,7 +675,6 @@ fun SongCard(
         }
         Spacer(modifier = Modifier.width(8.dp))
 
-        // NEW: Clean UI! Only show icons if NOT in selection mode
         if (!isSelectionMode) {
             IconButton(onClick = onFavoriteToggle) { Icon(imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, contentDescription = "Favorite", tint = if (isFavorite) Color.Red else textColor.copy(alpha = 0.8f)) }
 
