@@ -239,16 +239,9 @@ fun PlayerScreen(
                     }
 
                     // THE FIX: Explicit Toast Messages
+// Clean, premium Repeat Button (No Text/Toasts)
                     IconButton(
-                        onClick = {
-                            val newState = playerViewModel.toggleRepeatMode()
-                            val msg = when(newState) {
-                                RepeatState.ONCE -> "Repeat: Once"
-                                RepeatState.TOTALLY -> "Repeat: Totally"
-                                else -> "Repeat: Off"
-                            }
-                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                        },
+                        onClick = { playerViewModel.toggleRepeatMode() },
                         modifier = Modifier.size(48.dp)
                     ) {
                         Icon(repeatIcon, "Repeat", tint = repeatTint, modifier = Modifier.size(28.dp))
