@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,10 +34,10 @@ import androidx.media3.common.Player
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.musicplayer.viewmodel.EqualizerViewModel
 import com.example.musicplayer.viewmodel.FavoriteViewModel
 import com.example.musicplayer.viewmodel.PlayerViewModel
 import com.example.musicplayer.viewmodel.RepeatState
-import com.example.musicplayer.viewmodel.EqualizerViewModel
 
 @SuppressLint("DefaultLocale")
 fun formatTime(ms: Long): String {
@@ -47,13 +48,24 @@ fun formatTime(ms: Long): String {
     return String.format("%d:%02d", minutes, seconds)
 }
 
+// NEW: Helper function to translate raw Hz into human-readable terms
+fun getFrequencyLabel(hz: Int): String {
+    return when {
+        hz < 100 -> "Sub Bass"
+        hz < 300 -> "Bass"
+        hz < 2000 -> "Mid"
+        hz < 5000 -> "Presence"
+        else -> "Treble"
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
     navController: NavController,
     playerViewModel: PlayerViewModel,
     favoriteViewModel: FavoriteViewModel = hiltViewModel(),
-    equalizerViewModel: EqualizerViewModel = hiltViewModel() // NEW: EQ ViewModel
+    equalizerViewModel: EqualizerViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val song by playerViewModel.currentSong.collectAsState()
@@ -69,7 +81,6 @@ fun PlayerScreen(
     var sliderPosition by remember { mutableFloatStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
 
-    // EQ Bottom Sheet State
     var showEqSheet by remember { mutableStateOf(false) }
 
     val animatedProgress by animateFloatAsState(
@@ -103,8 +114,13 @@ fun PlayerScreen(
                     }
                 },
                 actions = {
-                    // NEW: EQ Button
-                    IconButton(onClick = { showEqSheet = true }) {
+                    IconButton(
+                        onClick = { showEqSheet = true },
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
                         Icon(Icons.Default.Tune, contentDescription = "Equalizer", tint = MaterialTheme.colorScheme.primary)
                     }
                 },
@@ -259,11 +275,13 @@ fun PlayerScreen(
             }
         }
 
-        // NEW: Equalizer Bottom Sheet
         if (showEqSheet) {
+            @OptIn(ExperimentalMaterial3Api::class)
             ModalBottomSheet(
                 onDismissRequest = { showEqSheet = false },
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 16.dp,
+                dragHandle = { BottomSheetDefaults.DragHandle() }
             ) {
                 EqualizerContent(equalizerViewModel)
             }
@@ -272,7 +290,7 @@ fun PlayerScreen(
 }
 
 // ------------------------------------------------------------------
-// EQUALIZER COMPONENTS
+// PREMIUM STUDIO MIXER EQUALIZER UI
 // ------------------------------------------------------------------
 
 @Composable
@@ -289,46 +307,68 @@ fun EqualizerContent(viewModel: EqualizerViewModel) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 24.dp, end = 24.dp, bottom = 48.dp, top = 16.dp),
+            .padding(bottom = 48.dp, top = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Header & Enable Toggle
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Equalizer", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text("Audio Mixer", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
             Switch(
                 checked = isEnabled,
-                onCheckedChange = { viewModel.toggleEqualizer(it) }
+                onCheckedChange = { viewModel.toggleEqualizer(it) },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                )
             )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Preset Dropdown
-        Box(modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(
-                onClick = { expanded = true },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = isEnabled
+        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable(enabled = isEnabled) { expanded = true },
+                color = if (isEnabled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
             ) {
-                Text(currentPreset ?: "Select Preset", color = if (isEnabled) MaterialTheme.colorScheme.primary else Color.Gray)
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(Icons.Default.ArrowDropDown, null)
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("PRESET", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = currentPreset ?: "Select Preset",
+                            color = if (isEnabled) MaterialTheme.colorScheme.onSurface else Color.Gray,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
+                    }
+                    Icon(Icons.Default.ArrowDropDown, null, tint = if (isEnabled) MaterialTheme.colorScheme.primary else Color.Gray)
+                }
             }
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
-                modifier = Modifier.fillMaxWidth(0.8f)
+                modifier = Modifier.fillMaxWidth(0.85f).background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 presets.forEach { preset ->
                     DropdownMenuItem(
-                        text = { Text(preset) },
+                        text = { Text(preset, fontWeight = if (preset == currentPreset) FontWeight.Bold else FontWeight.Normal) },
                         onClick = {
                             viewModel.setPreset(preset)
                             expanded = false
+                        },
+                        trailingIcon = {
+                            if (preset == currentPreset) {
+                                Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                            }
                         }
                     )
                 }
@@ -337,20 +377,49 @@ fun EqualizerContent(viewModel: EqualizerViewModel) {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Band Sliders (Using Compose Custom Layout Trick for Vertical Sliders)
+        // Studio Channel Strips (Frequency Bands)
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.Bottom
         ) {
             bands.forEach { band ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                val dbValue = band.level / 100
+                val dbString = if (dbValue > 0) "+$dbValue" else "$dbValue"
 
-                    // The Custom Vertical Slider
+                // NEW: Calculate the dynamic label (Bass, Mid, Treble)
+                val friendlyLabel = getFrequencyLabel(band.centerFreqHz)
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isEnabled) 0.4f else 0.1f))
+                        .padding(vertical = 16.dp, horizontal = 8.dp)
+                ) {
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.background.copy(alpha = if (isEnabled) 0.8f else 0.4f))
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = dbString,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isEnabled) MaterialTheme.colorScheme.primary else Color.Gray
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
                     Box(
                         modifier = Modifier
                             .width(40.dp)
-                            .height(200.dp),
+                            .height(160.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Slider(
@@ -358,22 +427,41 @@ fun EqualizerContent(viewModel: EqualizerViewModel) {
                             onValueChange = { viewModel.setBandLevel(band.index, it.toInt().toShort()) },
                             valueRange = minLevel.toFloat()..maxLevel.toFloat(),
                             enabled = isEnabled,
+                            colors = SliderDefaults.colors(
+                                thumbColor = MaterialTheme.colorScheme.primary,
+                                activeTrackColor = MaterialTheme.colorScheme.primary,
+                                inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
                             modifier = Modifier
-                                .requiredWidth(200.dp) // Width dictates the height of the vertical slider
+                                .requiredWidth(160.dp)
                                 .requiredHeight(40.dp)
-                                .graphicsLayer {
-                                    rotationZ = -90f // Rotate it to stand up
-                                }
+                                .graphicsLayer { rotationZ = -90f }
                         )
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Frequency Label (e.g., "60 Hz", "14 kHz")
+                    // NEW: Displaying the friendly text label (Bass, Treble, etc)
+                    Text(
+                        text = friendlyLabel,
+                        fontSize = 10.sp,
+                        color = if (isEnabled) MaterialTheme.colorScheme.primary else Color.Gray,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+
+                    Spacer(modifier = Modifier.height(2.dp))
+
                     Text(
                         text = if (band.centerFreqHz >= 1000) "${band.centerFreqHz / 1000}k" else "${band.centerFreqHz}",
-                        fontSize = 12.sp,
+                        fontSize = 14.sp,
                         color = if (isEnabled) MaterialTheme.colorScheme.onSurface else Color.Gray,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = "Hz",
+                        fontSize = 10.sp,
+                        color = Color.Gray,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -383,7 +471,7 @@ fun EqualizerContent(viewModel: EqualizerViewModel) {
 }
 
 // ------------------------------------------------------------------
-// EXISTING COMPONENTS
+// PROGRESS BAR COMPONENT
 // ------------------------------------------------------------------
 
 @Composable
