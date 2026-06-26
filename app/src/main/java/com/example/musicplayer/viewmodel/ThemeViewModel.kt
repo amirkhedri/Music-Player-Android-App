@@ -7,17 +7,47 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 
-// NEW: This single global object ensures every screen shares the exact same switch
+enum class AppThemeMode { LIGHT, DARK, GLASSY }
+
 object ThemeState {
-    val isDarkMode = MutableStateFlow(true) // Set to true if you want Dark Mode by default!
+    val isDarkMode = MutableStateFlow(true)
+    val isGlassyMode = MutableStateFlow(true)
 }
 
 @HiltViewModel
 class ThemeViewModel @Inject constructor() : ViewModel() {
 
     val isDarkMode: StateFlow<Boolean> = ThemeState.isDarkMode.asStateFlow()
+    val isGlassyMode: StateFlow<Boolean> = ThemeState.isGlassyMode.asStateFlow()
 
-    fun toggleTheme() {
-        ThemeState.isDarkMode.value = !ThemeState.isDarkMode.value
+    fun setThemeMode(mode: AppThemeMode) {
+        when (mode) {
+            AppThemeMode.LIGHT -> {
+                ThemeState.isDarkMode.value = false
+                ThemeState.isGlassyMode.value = false
+            }
+            AppThemeMode.DARK -> {
+                ThemeState.isDarkMode.value = true
+                ThemeState.isGlassyMode.value = false
+            }
+            AppThemeMode.GLASSY -> {
+                ThemeState.isDarkMode.value = true
+                ThemeState.isGlassyMode.value = true
+            }
+        }
+    }
+
+    fun cycleTheme() {
+        val currentMode = when {
+            ThemeState.isGlassyMode.value -> AppThemeMode.GLASSY
+            ThemeState.isDarkMode.value -> AppThemeMode.DARK
+            else -> AppThemeMode.LIGHT
+        }
+        val nextMode = when (currentMode) {
+            AppThemeMode.LIGHT -> AppThemeMode.DARK
+            AppThemeMode.DARK -> AppThemeMode.GLASSY
+            AppThemeMode.GLASSY -> AppThemeMode.LIGHT
+        }
+        setThemeMode(nextMode)
     }
 }
