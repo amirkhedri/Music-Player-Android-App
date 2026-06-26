@@ -1,8 +1,10 @@
 package com.example.musicplayer.viewmodel
 
 import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.content.IntentSender
+import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import androidx.core.net.toUri
@@ -19,7 +21,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class SortOrder { TITLE, ARTIST }
+// THE FIX: Added DATE sorting
+enum class SortOrder { DATE, TITLE, ARTIST }
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
@@ -29,7 +32,8 @@ class LibraryViewModel @Inject constructor(
     private val _allSongs = MutableStateFlow<List<Song>>(emptyList())
     val allSongs: StateFlow<List<Song>> = _allSongs
 
-    private val _sortOrder = MutableStateFlow(SortOrder.TITLE)
+    // Default to sorting by newest first
+    private val _sortOrder = MutableStateFlow(SortOrder.DATE)
     val sortOrder: StateFlow<SortOrder> = _sortOrder
 
     private val _deletePendingIntent = MutableSharedFlow<IntentSender>()
@@ -56,11 +60,13 @@ class LibraryViewModel @Inject constructor(
                 MediaStore.Audio.Media.TITLE,
                 MediaStore.Audio.Media.ARTIST,
                 MediaStore.Audio.Media.DURATION,
-                MediaStore.Audio.Media.ALBUM_ID
+                MediaStore.Audio.Media.ALBUM_ID,
+                MediaStore.Audio.Media.DATE_ADDED // THE FIX: Grab the creation date
             )
 
             val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
-            val sort = "${MediaStore.Audio.Media.TITLE} ASC"
+            // Start with newest first by default
+            val sort = "${MediaStore.Audio.Media.DATE_ADDED} DESC"
 
             context.contentResolver.query(collection, projection, selection, null, sort)?.use { cursor ->
                 val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
@@ -68,26 +74,27 @@ class LibraryViewModel @Inject constructor(
                 val artistColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
                 val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
                 val albumIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
+                val dateAddedColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
 
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idColumn)
                     val title = cursor.getString(titleColumn) ?: "Unknown"
                     val artist = cursor.getString(artistColumn) ?: "Unknown Artist"
                     val duration = cursor.getLong(durationColumn)
+                    val dateAdded = cursor.getLong(dateAddedColumn)
                     val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
 
                     val albumArtworkUri = "content://media/external/audio/albumart/${cursor.getLong(albumIdColumn)}".toUri()
 
-                    // Inside LibraryViewModel.kt -> scanDeviceForMusic()
-
                     songsList.add(
                         Song(
-                            id = id, // THE FIX: Removed .toString() so it passes the raw Long
+                            id = id,
                             title = title,
                             artist = artist,
                             uri = uri,
                             albumArtUri = albumArtworkUri,
-                            durationMs = duration
+                            durationMs = duration,
+                            dateAdded = dateAdded
                         )
                     )
                 }
@@ -106,8 +113,32 @@ class LibraryViewModel @Inject constructor(
     private fun applySorting(order: SortOrder) {
         val currentList = _allSongs.value
         _allSongs.value = when (order) {
+            SortOrder.DATE -> currentList.sortedByDescending { it.dateAdded } // Newest first
             SortOrder.TITLE -> currentList.sortedBy { it.title.lowercase() }
             SortOrder.ARTIST -> currentList.sortedBy { it.artist.lowercase() }
+        }
+    }
+
+    // THE FIX: Snappy Rename Logic
+    fun renameSong(context: Context, songUri: String, newTitle: String) {
+        // 1. Instantly update the UI so it feels incredibly fast to the user
+        val updatedList = _allSongs.value.map { song ->
+            if (song.uri.toString() == songUri) song.copy(title = newTitle) else song
+        }
+        _allSongs.value = updatedList
+        applySorting(_sortOrder.value)
+
+        // 2. Silently update the Android MediaStore in the background
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val uri = Uri.parse(songUri)
+                val values = ContentValues().apply {
+                    put(MediaStore.Audio.Media.TITLE, newTitle)
+                }
+                context.contentResolver.update(uri, values, null, null)
+            } catch (e: Exception) {
+                e.printStackTrace() // On API 30+, Scoped Storage might block this if it's not our file, but the UI will still reflect the local change!
+            }
         }
     }
 

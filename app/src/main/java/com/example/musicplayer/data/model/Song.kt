@@ -11,7 +11,8 @@ data class Song(
     val id: Long,
     val title: String,
     val artist: String,
+    val uri: android.net.Uri,
+    val albumArtUri: android.net.Uri?,
     val durationMs: Long,
-    val uri: Uri,
-    val albumArtUri: Uri? = null
+    val dateAdded: Long = 0L // Add this line!
 )

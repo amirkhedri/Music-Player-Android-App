@@ -3,6 +3,7 @@ package com.example.musicplayer.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import com.example.musicplayer.data.model.Song
 import com.example.musicplayer.player.PlayerController
@@ -16,11 +17,9 @@ import javax.inject.Inject
 
 enum class RepeatState { OFF, ONCE, TOTALLY }
 
-// THE FIX: Explicitly opt-in to Media3's advanced features
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
-    // THE FIX: Put 'private val' back so the rest of the class can see it!
     private val playerController: PlayerController
 ) : ViewModel() {
 
@@ -35,8 +34,13 @@ class PlayerViewModel @Inject constructor(
     private val _currentPosition = MutableStateFlow(0f)
     val currentPosition: StateFlow<Float> = _currentPosition
 
+    // THE RESTORED DURATION VARIABLE
     private val _duration = MutableStateFlow(0L)
     val duration: StateFlow<Long> = _duration
+
+    // THE SPEED VARIABLE
+    private val _playbackSpeed = MutableStateFlow(1.0f)
+    val playbackSpeed: StateFlow<Float> = _playbackSpeed
 
     private val _isShuffleEnabled = MutableStateFlow(false)
     val isShuffleEnabled: StateFlow<Boolean> = _isShuffleEnabled
@@ -68,7 +72,6 @@ class PlayerViewModel @Inject constructor(
                         exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
                     }
                 }
-
                 updateCurrentSong(mediaItem)
             }
 
@@ -84,6 +87,12 @@ class PlayerViewModel @Inject constructor(
         })
     }
 
+    // THE SPEED LOGIC
+    fun setPlaybackSpeed(speed: Float) {
+        exoPlayer.playbackParameters = PlaybackParameters(speed)
+        _playbackSpeed.value = speed
+    }
+
     fun playQueue(songs: List<Song>, startIndex: Int) {
         currentQueue = songs
         playerController.playQueue(songs, startIndex)
@@ -95,9 +104,7 @@ class PlayerViewModel @Inject constructor(
 
     fun skipNext() {
         when (_repeatState.value) {
-            RepeatState.TOTALLY -> {
-                exoPlayer.seekTo(0L)
-            }
+            RepeatState.TOTALLY -> exoPlayer.seekTo(0L)
             RepeatState.ONCE -> {
                 _repeatState.value = RepeatState.OFF
                 exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
@@ -117,9 +124,7 @@ class PlayerViewModel @Inject constructor(
 
     fun skipPrevious() {
         when (_repeatState.value) {
-            RepeatState.TOTALLY -> {
-                exoPlayer.seekTo(0L)
-            }
+            RepeatState.TOTALLY -> exoPlayer.seekTo(0L)
             RepeatState.ONCE -> {
                 _repeatState.value = RepeatState.OFF
                 exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
