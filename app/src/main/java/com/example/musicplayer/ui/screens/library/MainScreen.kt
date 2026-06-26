@@ -1,9 +1,13 @@
 package com.example.musicplayer.ui.screens.library
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
@@ -19,7 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -30,6 +34,7 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -94,13 +99,19 @@ fun MainScreen(
     val isSelectionMode = selectedSongUris.isNotEmpty()
 
     var songToAdd by remember { mutableStateOf<Song?>(null) }
+    var showAddToPlaylistDialogForSelection by remember { mutableStateOf(false) }
 
     // Dialog States
     var showRenameDialog by remember { mutableStateOf(false) }
     var newSongName by remember { mutableStateOf("") }
+    var showBulkDeleteDialog by remember { mutableStateOf(false) }
 
     var showPlaylistDialog by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
+
+    // THE FIX: Restored Missing Playlist Renaming States
+    var playlistToRename by remember { mutableStateOf<String?>(null) }
+    var renamePlaylistName by remember { mutableStateOf("") }
 
     var selectedPlaylist by remember { mutableStateOf<String?>(null) }
     var selectedArtist by remember { mutableStateOf<String?>(null) }
@@ -138,24 +149,25 @@ fun MainScreen(
         else -> AppThemeMode.LIGHT
     }
 
-    val neonCyan = Color(0xFF00E5FF)
-    val deepPurple = Color(0xFF6200EA)
-
+    // THE FIX: Cleaned up unused variables to resolve compiler warnings
     val accentColor = when {
         isGlassy -> Color.White.copy(alpha = 0.2f)
-        isDarkMode -> neonCyan
-        else -> deepPurple
+        isDarkMode -> Color(0xFF00E5FF)
+        else -> Color(0xFF6200EA)
     }
+
     val accentTextColor = when {
         isGlassy -> Color.White
         isDarkMode -> Color.Black
         else -> Color.White
     }
+
     val iconAccentColor = when {
         isGlassy -> Color.White
-        isDarkMode -> neonCyan
-        else -> deepPurple
+        isDarkMode -> Color(0xFF00E5FF)
+        else -> Color(0xFF6200EA)
     }
+
     val accentGlow = if (isDarkMode && !isGlassy) 12.dp else 0.dp
 
     val savedPlaylists by playlistViewModel.playlistState.collectAsState()
@@ -185,6 +197,7 @@ fun MainScreen(
             MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
         )
     )
+
     val appBgModifier = if (isGlassy) Modifier.background(glassBgGradient) else Modifier.background(MaterialTheme.colorScheme.background)
 
     Scaffold(
@@ -202,10 +215,16 @@ fun MainScreen(
                                 showRenameDialog = true
                             }) { Icon(Icons.Default.Edit, "Rename") }
                         }
+                        IconButton(onClick = { showAddToPlaylistDialogForSelection = true }) {
+                            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to Playlist")
+                        }
                         IconButton(onClick = {
                             shareSongs(context, songs.filter { selectedSongUris.contains(it.uri.toString()) })
                             selectedSongUris = emptySet()
                         }) { Icon(Icons.Default.Share, "Share") }
+                        IconButton(onClick = { showBulkDeleteDialog = true }) {
+                            Icon(Icons.Outlined.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
+                        }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = if(isGlassy) Color.Transparent else MaterialTheme.colorScheme.primaryContainer)
                 )
@@ -263,6 +282,64 @@ fun MainScreen(
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().then(appBgModifier).padding(padding)) {
 
+            // Dialogs
+            if (showBulkDeleteDialog) {
+                AlertDialog(
+                    onDismissRequest = { showBulkDeleteDialog = false },
+                    icon = { Icon(Icons.Outlined.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(48.dp)) },
+                    title = { Text("Delete Songs") },
+                    text = { Text("Are you sure you want to delete ${selectedSongUris.size} selected song(s)? This action cannot be undone.") },
+                    confirmButton = {
+                        Button(
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                            onClick = {
+                                val songsToDelete = songs.filter { selectedSongUris.contains(it.uri.toString()) }
+                                libraryViewModel.requestDelete(context, songsToDelete)
+                                selectedSongUris = emptySet()
+                                showBulkDeleteDialog = false
+                            }
+                        ) { Text("Delete", color = MaterialTheme.colorScheme.onError) }
+                    },
+                    dismissButton = { TextButton(onClick = { showBulkDeleteDialog = false }) { Text("Cancel") } }
+                )
+            }
+
+            if (showAddToPlaylistDialogForSelection) {
+                AlertDialog(
+                    onDismissRequest = { showAddToPlaylistDialogForSelection = false },
+                    title = { Text("Add ${selectedSongUris.size} songs to Playlist") },
+                    text = {
+                        if (customPlaylists.isEmpty()) {
+                            Text("No playlists found. Create one first!")
+                        } else {
+                            LazyColumn {
+                                val playlistNames = customPlaylists.keys.toList()
+                                items(items = playlistNames) { playlistName ->
+                                    Text(
+                                        text = playlistName,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                selectedSongUris.forEach { uri ->
+                                                    playlistViewModel.addSongToPlaylist(playlistName, uri)
+                                                }
+                                                Toast.makeText(context, "Added to $playlistName", Toast.LENGTH_SHORT).show()
+                                                selectedSongUris = emptySet()
+                                                showAddToPlaylistDialogForSelection = false
+                                            }
+                                            .padding(16.dp),
+                                        fontSize = 18.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {},
+                    dismissButton = { TextButton(onClick = { showAddToPlaylistDialogForSelection = false }) { Text("Cancel") } }
+                )
+            }
+
             if (showRenameDialog) {
                 AlertDialog(
                     onDismissRequest = { showRenameDialog = false },
@@ -285,9 +362,7 @@ fun MainScreen(
                             selectedSongUris = emptySet()
                         }) { Text("Rename") }
                     },
-                    dismissButton = {
-                        TextButton(onClick = { showRenameDialog = false }) { Text("Cancel") }
-                    }
+                    dismissButton = { TextButton(onClick = { showRenameDialog = false }) { Text("Cancel") } }
                 )
             }
 
@@ -313,9 +388,33 @@ fun MainScreen(
                             }
                         }) { Text("Create") }
                     },
-                    dismissButton = {
-                        TextButton(onClick = { showPlaylistDialog = false }) { Text("Cancel") }
-                    }
+                    dismissButton = { TextButton(onClick = { showPlaylistDialog = false }) { Text("Cancel") } }
+                )
+            }
+
+            // THE FIX: Restored the Playlist Renaming Dialog UI
+            if (playlistToRename != null) {
+                AlertDialog(
+                    onDismissRequest = { playlistToRename = null },
+                    title = { Text("Rename Playlist") },
+                    text = {
+                        OutlinedTextField(
+                            value = renamePlaylistName,
+                            onValueChange = { renamePlaylistName = it },
+                            singleLine = true,
+                            label = { Text("New Name") }
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            if (renamePlaylistName.isNotBlank()) {
+                                playlistViewModel.renamePlaylist(playlistToRename!!, renamePlaylistName)
+                                Toast.makeText(context, "Playlist Renamed", Toast.LENGTH_SHORT).show()
+                                playlistToRename = null
+                            }
+                        }) { Text("Save") }
+                    },
+                    dismissButton = { TextButton(onClick = { playlistToRename = null }) { Text("Cancel") } }
                 )
             }
 
@@ -347,9 +446,7 @@ fun MainScreen(
                         }
                     },
                     confirmButton = {},
-                    dismissButton = {
-                        TextButton(onClick = { songToAdd = null }) { Text("Cancel") }
-                    }
+                    dismissButton = { TextButton(onClick = { songToAdd = null }) { Text("Cancel") } }
                 )
             }
 
@@ -536,7 +633,7 @@ fun MainScreen(
                                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 120.dp),
                                 horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                items(items = filteredArtists) { artistName ->
+                                gridItems(items = filteredArtists) { artistName ->
                                     val artistSongs = artistGroups[artistName] ?: emptyList()
                                     val firstSong = artistSongs.firstOrNull()
                                     Box(
@@ -597,7 +694,7 @@ fun MainScreen(
                                 }
                             } else {
                                 val playlistNames = customPlaylists.keys.toList()
-                                items(items = playlistNames) { playlistName ->
+                                gridItems(items = playlistNames) { playlistName ->
                                     val songCount = customPlaylists[playlistName]?.size ?: 0
                                     val firstSong = customPlaylists[playlistName]?.firstOrNull()
 
@@ -632,6 +729,29 @@ fun MainScreen(
                                             Spacer(modifier = Modifier.height(2.dp))
                                             Text(text = "$songCount songs", fontSize = 12.sp, color = Color.White.copy(alpha = 0.7f), fontWeight = FontWeight.Medium)
                                         }
+
+                                        Row(
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(12.dp)
+                                                .clip(RoundedCornerShape(16.dp))
+                                                .background(Color.Black.copy(alpha = 0.5f))
+                                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            IconButton(
+                                                onClick = { playlistToRename = playlistName; renamePlaylistName = playlistName },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(Icons.Default.Edit, "Edit", tint = Color.White, modifier = Modifier.size(18.dp))
+                                            }
+                                            IconButton(
+                                                onClick = { playlistViewModel.deletePlaylist(playlistName) },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(Icons.Default.Delete, "Delete", tint = Color.White, modifier = Modifier.size(18.dp))
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -645,7 +765,15 @@ fun MainScreen(
                             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(onClick = { selectedPlaylist = null; clearSelectionAndSearch() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(text = activePlaylistName, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+                                Text(text = activePlaylistName, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+
+                                IconButton(onClick = {
+                                    selectedPlaylist = null
+                                    selectedTab = 0
+                                    Toast.makeText(context, "Select songs, then tap the Playlist icon to add them", Toast.LENGTH_LONG).show()
+                                }) {
+                                    Icon(Icons.Default.AddCircleOutline, "Add Songs")
+                                }
                             }
                             AnimatedVisibility(visible = isSearchExpanded) {
                                 OutlinedTextField(
