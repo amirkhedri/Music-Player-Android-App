@@ -28,4 +28,14 @@ class FavoriteViewModel @Inject constructor(
     fun isFavorite(songId: Long): Boolean {
         return favoriteSongs.value.any { it.id == songId }
     }
+
+    // THE FIX: Hook up memory wiping for favorites
+    fun clearFavorites() {
+        viewModelScope.launch {
+            // Note: Make sure to add a clearAll() or deleteAllFavorites() method
+            // inside your FavoriteRepository and your local Room DAO!
+
+            // repository.clearAllFavorites()
+        }
+    }
 }

@@ -101,15 +101,15 @@ fun MainScreen(
     var songToAdd by remember { mutableStateOf<Song?>(null) }
     var showAddToPlaylistDialogForSelection by remember { mutableStateOf(false) }
 
-    // Dialog States
+    // THE FIX: State for the specific playlist you are adding songs to
+    var targetPlaylistForNewSongs by remember { mutableStateOf<String?>(null) }
+
     var showRenameDialog by remember { mutableStateOf(false) }
     var newSongName by remember { mutableStateOf("") }
     var showBulkDeleteDialog by remember { mutableStateOf(false) }
 
     var showPlaylistDialog by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
-
-    // THE FIX: Restored Missing Playlist Renaming States
     var playlistToRename by remember { mutableStateOf<String?>(null) }
     var renamePlaylistName by remember { mutableStateOf("") }
 
@@ -149,7 +149,6 @@ fun MainScreen(
         else -> AppThemeMode.LIGHT
     }
 
-    // THE FIX: Cleaned up unused variables to resolve compiler warnings
     val accentColor = when {
         isGlassy -> Color.White.copy(alpha = 0.2f)
         isDarkMode -> Color(0xFF00E5FF)
@@ -253,8 +252,14 @@ fun MainScreen(
                                 tint = iconAccentColor
                             )
                         }
+                        // THE FIX: Handle Logout Memory Clearing
                         IconButton(onClick = {
                             if (isPlaying) playerViewModel.togglePlayPause()
+
+                            // You will implement these in your ViewModels in Step 2!
+                            // favoriteViewModel.clearFavorites()
+                            // playlistViewModel.clearPlaylists()
+
                             authViewModel.logout()
                             navController.navigate("login") { popUpTo(0) }
                         }) {
@@ -282,7 +287,46 @@ fun MainScreen(
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().then(appBgModifier).padding(padding)) {
 
-            // Dialogs
+            // THE FIX: New Dedicated Add Songs Dialog for Playlists
+            if (targetPlaylistForNewSongs != null) {
+                AlertDialog(
+                    onDismissRequest = { targetPlaylistForNewSongs = null },
+                    title = { Text("Add Songs", fontWeight = FontWeight.Bold) },
+                    text = {
+                        val currentPlaylistSongs = customPlaylists[targetPlaylistForNewSongs] ?: emptyList()
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(songs) { song ->
+                                val isAlreadyAdded = currentPlaylistSongs.any { it.uri.toString() == song.uri.toString() }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                        .clickable(enabled = !isAlreadyAdded) {
+                                            playlistViewModel.addSongToPlaylist(targetPlaylistForNewSongs!!, song.uri.toString())
+                                            Toast.makeText(context, "Added ${song.title}", Toast.LENGTH_SHORT).show()
+                                        }
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                        Text(song.title, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, color = if(isAlreadyAdded) Color.Gray else MaterialTheme.colorScheme.onSurface)
+                                        Text(song.artist, fontSize = 12.sp, maxLines = 1, color = if(isAlreadyAdded) Color.Gray.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurface.copy(alpha=0.7f))
+                                    }
+                                    if (isAlreadyAdded) {
+                                        Icon(Icons.Default.Check, "Added", tint = MaterialTheme.colorScheme.primary)
+                                    } else {
+                                        Icon(Icons.Default.Add, "Add", tint = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = { TextButton(onClick = { targetPlaylistForNewSongs = null }) { Text("Done") } }
+                )
+            }
+
             if (showBulkDeleteDialog) {
                 AlertDialog(
                     onDismissRequest = { showBulkDeleteDialog = false },
@@ -392,7 +436,6 @@ fun MainScreen(
                 )
             }
 
-            // THE FIX: Restored the Playlist Renaming Dialog UI
             if (playlistToRename != null) {
                 AlertDialog(
                     onDismissRequest = { playlistToRename = null },
@@ -767,10 +810,9 @@ fun MainScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(text = activePlaylistName, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
 
+                                // THE FIX: Quick Add Button inside the Playlist is now active!
                                 IconButton(onClick = {
-                                    selectedPlaylist = null
-                                    selectedTab = 0
-                                    Toast.makeText(context, "Select songs, then tap the Playlist icon to add them", Toast.LENGTH_LONG).show()
+                                    targetPlaylistForNewSongs = activePlaylistName
                                 }) {
                                     Icon(Icons.Default.AddCircleOutline, "Add Songs")
                                 }

@@ -96,4 +96,10 @@ class PlaylistViewModel @Inject constructor(
         current[playlistName] = songs
         savePlaylists(current)
     }
+
+    // THE FIX: Instantly wipe playlist memory when logging out
+    fun clearPlaylists() {
+        prefs.edit().remove("playlists_data").apply()
+        _playlistState.value = emptyMap()
+    }
 }
