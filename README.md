@@ -6,15 +6,82 @@ A modern, feature-rich Android Music Player built entirely with **Kotlin** and *
 
 ## 📱 Screenshots
 
->![alt text](photo_2026-06-26_16-53-58.jpg)
-![alt text](image-1.png)
-![alt text](image-2.png)
-![alt text](photo_9_2026-06-26_17-01-04.jpg) ![alt text](photo_10_2026-06-26_17-01-04.jpg) ![alt text](photo_5_2026-06-26_17-01-04.jpg) ![alt text](photo_6_2026-06-26_17-01-04.jpg) ![alt text](photo_7_2026-06-26_17-01-04.jpg) ![alt text](photo_8_2026-06-26_17-01-04.jpg) ![alt text](photo_2_2026-06-26_17-01-04.jpg) ![alt text](photo_3_2026-06-26_17-01-04.jpg) ![alt text](photo_4_2026-06-26_17-01-04.jpg) ![alt text](photo_1_2026-06-26_17-01-04.jpg)
-![alt text](photo_2026-06-26_17-01-43.jpg)
+<div align="center">
 
-| Library | Player | Artists | Playlists |
-|---------|----------|----------|------------|
-| Screenshot | Screenshot | Screenshot | Screenshot |
+### Authentication & Library
+
+<table>
+<tr>
+<td align="center">
+<img src="photo_2026-06-26_16-53-58.jpg" width="220"/>
+<br><b>Login Screen</b>
+</td>
+<td align="center">
+<img src="image-1.png" width="220"/>
+<br><b>Library</b>
+</td>
+<td align="center">
+<img src="image-2.png" width="220"/>
+<br><b>Now Playing</b>
+</td>
+</tr>
+</table>
+
+### Artists & Favorites
+
+<table>
+<tr>
+<td align="center">
+<img src="photo_1_2026-06-26_17-01-04.jpg" width="180"/>
+</td>
+<td align="center">
+<img src="photo_2_2026-06-26_17-01-04.jpg" width="180"/>
+</td>
+<td align="center">
+<img src="photo_3_2026-06-26_17-01-04.jpg" width="180"/>
+</td>
+<td align="center">
+<img src="photo_4_2026-06-26_17-01-04.jpg" width="180"/>
+</td>
+</tr>
+</table>
+
+### Playlists
+
+<table>
+<tr>
+<td align="center">
+<img src="photo_5_2026-06-26_17-01-04.jpg" width="180"/>
+</td>
+<td align="center">
+<img src="photo_6_2026-06-26_17-01-04.jpg" width="180"/>
+</td>
+<td align="center">
+<img src="photo_7_2026-06-26_17-01-04.jpg" width="180"/>
+</td>
+<td align="center">
+<img src="photo_8_2026-06-26_17-01-04.jpg" width="180"/>
+</td>
+</tr>
+</table>
+
+### Music Management
+
+<table>
+<tr>
+<td align="center">
+<img src="photo_9_2026-06-26_17-01-04.jpg" width="180"/>
+</td>
+<td align="center">
+<img src="photo_10_2026-06-26_17-01-04.jpg" width="180"/>
+</td>
+<td align="center">
+<img src="photo_2026-06-26_17-01-43.jpg" width="180"/>
+</td>
+</tr>
+</table>
+
+</div>
 
 ---
 
