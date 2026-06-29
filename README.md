@@ -83,7 +83,7 @@ This project is built with a modern Android tech stack, strictly following the *
 
 1. **Clone the repository:**
    ```bash
-   git clone [https://github.com/amirkhedri/Music-Player-Android-App.git](https://github.com/amirkhedri/Music-Player-Android-App.git)
+   git clone https://github.com/amirkhedri/Music-Player-Android-App.git
 Open the project in Android Studio.
 
 Sync project dependencies with Gradle.
@@ -93,6 +93,7 @@ Run the application on an Android emulator or a physical device.
 Note: The app will request permissions to read audio files from your device on the first launch. Please grant these permissions to successfully populate the music library.
 
 📁 Project Structure
+```bash
 .
 └── app/
     ├── src/
