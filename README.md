@@ -1,6 +1,3 @@
-
-
-```markdown
 <h1 align="center">🎵 Music Player Android App</h1>
 
 <p align="center">
@@ -87,20 +84,16 @@ This project is built with a modern Android tech stack, strictly following the *
 1. **Clone the repository:**
    ```bash
    git clone [https://github.com/amirkhedri/Music-Player-Android-App.git](https://github.com/amirkhedri/Music-Player-Android-App.git)
+Open the project in Android Studio.
 
-```
+Sync project dependencies with Gradle.
 
-2. **Open the project** in Android Studio.
-3. **Sync** project dependencies with Gradle.
-4. **Run** the application on an Android emulator or a physical device.
+Run the application on an Android emulator or a physical device.
 
-> **Note:** The app will request permissions to read audio files from your device on the first launch. Please grant these permissions to successfully populate the music library.
+Note: The app will request permissions to read audio files from your device on the first launch. Please grant these permissions to successfully populate the music library.
 
----
-
-## 📁 Project Structure
-
-```text
+📁 Project Structure
+Plaintext
 .
 └── app/
     ├── src/
@@ -120,15 +113,5 @@ This project is built with a modern Android tech stack, strictly following the *
     │   │   ├── AndroidManifest.xml   # App permissions and services
     │   │   └── res/                  # App resources (drawables, styles)
     └── build.gradle.kts              # App-level dependencies
-
-```
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License**. See the `LICENSE` file for details.
-
-```
-
-```
+📄 License
+This project is licensed under the MIT License. See the LICENSE file for details.
