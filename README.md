@@ -93,8 +93,7 @@ Run the application on an Android emulator or a physical device.
 Note: The app will request permissions to read audio files from your device on the first launch. Please grant these permissions to successfully populate the music library.
 
 📁 Project Structure
-
-
+.
 └── app/
     ├── src/
     │   ├── main/
@@ -113,5 +112,3 @@ Note: The app will request permissions to read audio files from your device on t
     │   │   ├── AndroidManifest.xml   # App permissions and services
     │   │   └── res/                  # App resources (drawables, styles)
     └── build.gradle.kts              # App-level dependencies
-📄 License
-This project is licensed under the MIT License. See the LICENSE file for details.
