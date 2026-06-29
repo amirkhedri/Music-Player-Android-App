@@ -16,12 +16,12 @@
 ### 🔑 Authentication & Settings
 | Login Screen | Create Account | Equalizer |
 | :---: | :---: | :---: |
-| <img src="ScreenShots/Login.jpg" width="250" alt="Login Screen"/> | <img src="ScreenShots/CreateAccount.jpg" width="250" alt="Create Account"/> | <img src="ScreenShots/Equilizer.jpg" width="250" alt="Equalizer"/> |
+| <img src="ScreenShots/Login.jpg" width="250" alt="Login Screen"/> | <img src="ScreenShots/CreateAccount.jpg" width="250" alt="Create Account"/> | <img src="ScreenShots/Equlizer.jpg" width="250" alt="Equalizer"/> |
 
 ### 🎶 Library & Discovery
 | Light Library | Dark Library | Artists View |
 | :---: | :---: | :---: |
-| <img src="ScreenShots/LightLibrary.jpg" width="250" alt="Light Library"/> | <img src="ScreenShots/Darklibrary.jpg" width="250" alt="Dark Library"/> | <img src="ScreenShots/Artists.jpg" width="250" alt="Artists View"/> |
+| <img src="ScreenShots/LightLibrary.jpg" width="250" alt="Light Library"/> | <img src="ScreenShots/DarkLibrary.jpg" width="250" alt="Dark Library"/> | <img src="ScreenShots/Artists.jpg" width="250" alt="Artists View"/> |
 
 ### ▶️ Playback Experience
 | Light Player | Dark Player | Glassy Theme |
@@ -31,7 +31,7 @@
 ### ❤️ Favorites & Immersive UI
 | Favorites | Playback Visualization | Immersive Controls |
 | :---: | :---: | :---: |
-| <img src="ScreenShots/Darkfavourite.jpg" width="250" alt="Favorites"/> | <img src="ScreenShots/playscreen1.png" width="250" alt="Visualization"/> | <img src="ScreenShots/playscreen2.png" width="250" alt="Immersive UI"/> |
+| <img src="ScreenShots/Darkfaivourite.jpg" width="250" alt="Favorites"/> | <img src="ScreenShots/playscreen1.png" width="250" alt="Visualization"/> | <img src="ScreenShots/playscreen2.png" width="250" alt="Immersive UI"/> |
 
 ---
 
@@ -94,7 +94,7 @@ Note: The app will request permissions to read audio files from your device on t
 
 📁 Project Structure
 
-.
+
 └── app/
     ├── src/
     │   ├── main/
