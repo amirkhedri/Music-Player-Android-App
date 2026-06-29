@@ -80,7 +80,7 @@ This project is built with a modern Android tech stack, strictly following the *
 * Android SDK 26 (Oreo) or higher
 
 ### Installation
-
+ You can Install the App with MusicPlayer.apk inside release folder or you can :
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/amirkhedri/Music-Player-Android-App.git
