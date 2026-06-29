@@ -16,22 +16,22 @@
 ### 🔑 Authentication & Settings
 | Login Screen | Create Account | Equalizer |
 | :---: | :---: | :---: |
-| <img src="ScreenShots/Login.png" width="250" alt="Login Screen"/> | <img src="ScreenShots/CreateAccount.png" width="250" alt="Create Account"/> | <img src="ScreenShots/Equilizer.png" width="250" alt="Equalizer"/> |
+| <img src="ScreenShots/Login.jpg" width="250" alt="Login Screen"/> | <img src="ScreenShots/CreateAccount.jpg" width="250" alt="Create Account"/> | <img src="ScreenShots/Equilizer.jpg" width="250" alt="Equalizer"/> |
 
 ### 🎶 Library & Discovery
 | Light Library | Dark Library | Artists View |
 | :---: | :---: | :---: |
-| <img src="ScreenShots/LightLibrary.png" width="250" alt="Light Library"/> | <img src="ScreenShots/Darklibrary.png" width="250" alt="Dark Library"/> | <img src="ScreenShots/Artists.png" width="250" alt="Artists View"/> |
+| <img src="ScreenShots/LightLibrary.jpg" width="250" alt="Light Library"/> | <img src="ScreenShots/Darklibrary.jpg" width="250" alt="Dark Library"/> | <img src="ScreenShots/Artists.jpg" width="250" alt="Artists View"/> |
 
 ### ▶️ Playback Experience
 | Light Player | Dark Player | Glassy Theme |
 | :---: | :---: | :---: |
-| <img src="ScreenShots/LightPlayer.png" width="250" alt="Light Player"/> | <img src="ScreenShots/DarkPlayer.png" width="250" alt="Dark Player"/> | <img src="ScreenShots/playscreenglassy.png" width="250" alt="Glassy Theme"/> |
+| <img src="ScreenShots/LightPlayer.jpg" width="250" alt="Light Player"/> | <img src="ScreenShots/DarkPlayer.jpg" width="250" alt="Dark Player"/> | <img src="ScreenShots/playscreenglassy.jpg" width="250" alt="Glassy Theme"/> |
 
 ### ❤️ Favorites & Immersive UI
 | Favorites | Playback Visualization | Immersive Controls |
 | :---: | :---: | :---: |
-| <img src="ScreenShots/Darkfavourite.png" width="250" alt="Favorites"/> | <img src="ScreenShots/playscreen1.png" width="250" alt="Visualization"/> | <img src="ScreenShots/playscreen2.png" width="250" alt="Immersive UI"/> |
+| <img src="ScreenShots/Darkfavourite.jpg" width="250" alt="Favorites"/> | <img src="ScreenShots/playscreen1.png" width="250" alt="Visualization"/> | <img src="ScreenShots/playscreen2.png" width="250" alt="Immersive UI"/> |
 
 ---
 
@@ -93,7 +93,7 @@ Run the application on an Android emulator or a physical device.
 Note: The app will request permissions to read audio files from your device on the first launch. Please grant these permissions to successfully populate the music library.
 
 📁 Project Structure
-Plaintext
+
 .
 └── app/
     ├── src/
